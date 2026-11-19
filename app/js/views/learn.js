@@ -29,6 +29,7 @@ function lesson(root, t) {
   let cur = Math.min(saved && !saved.done ? saved.step || 0 : 0, steps.length - 1);
   const passed = new Set(Array.from({ length: saved ? (saved.done ? steps.length : saved.step || 0) : 0 }, (_, k) => k));
   let lab = null, labId = null;
+  let speech = null;
 
   const stage = h("div.stage.card");
   const stepper = h("div.stepper");
@@ -61,6 +62,7 @@ function lesson(root, t) {
   }
 
   function go(k) {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
     cur = Math.max(0, Math.min(steps.length - 1, k)); const s = steps[cur];
     if (s.lab) mountLab(s.lab); else if (s.feynman && !lab) mountLab(t.steps[t.steps.length - 1].lab);
     panel.replaceChildren(...(s.feynman ? feynmanPanel() : stepPanel(s)));
@@ -80,11 +82,32 @@ function lesson(root, t) {
       h("div.step-top", h("span.step-k", `${T("step").toUpperCase()} ${cur + 1} / ${steps.length}`), tagPill(s.tag || "idea")),
       h("h2.step-title", L(s.title)), rich(s.body, "div", "step-body"),
       s.key ? h("div.key-idea", h("div.ki-head", icon("spark"), T("keyIdea")), rich(s.key)) : null,
+      s.story && t.id === "heap" ? heapDispatchActivity() : null,
+      !s.feynman && s.body ? h("button.btn.small.listen-step", { onclick: (e) => speakStep(s, e.currentTarget) }, icon("play"), bn ? "শুনুন" : "Listen to this explanation") : null,
     ];
     if (s.ask) out.push(askBlock(s.ask, () => { passed.add(cur); n.nxt.disabled = false; n.nxt.classList.add("pulse"); renderStepper(); store.record(t.id, true, { kind: "lesson", weight: 0.5 }); }, () => store.record(t.id, false, { kind: "lesson", weight: 0.3 }), s.story));
     else passed.add(cur);
     out.push(n.el, h("div.kbd-hint", h("kbd", "←"), h("kbd", "→"), bn ? " ধাপ বদলাও" : " step", " · ", h("button.linkish", { onclick: () => openTutor(bn ? `${L(s.title)} বুঝিয়ে দাও` : `explain ${L(t.title)}`) }, icon("chat"), bn ? " Jarvis-কে জিজ্ঞেস করো" : " ask Jarvis about this")));
     return out;
+  }
+
+  function speakStep(s, button) {
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) { toast(bn ? "এই browser-এ voice playback নেই" : "Voice playback is not available in this browser"); return; }
+    if (speech && window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); speech = null; button.textContent = bn ? "শুনুন" : "Listen to this explanation"; return; }
+    const text = `${L(s.title)}. ${L(s.body).replace(/[*`$]/g, " ")} ${s.key ? L(s.key) : ""}`;
+    speech = new SpeechSynthesisUtterance(text); speech.lang = bn ? "bn-BD" : "en-US"; speech.rate = 0.94;
+    speech.onend = speech.onerror = () => { speech = null; button.textContent = bn ? "শুনুন" : "Listen to this explanation"; };
+    button.textContent = bn ? "থামান" : "Stop listening"; window.speechSynthesis.cancel(); window.speechSynthesis.speak(speech);
+  }
+
+  function heapDispatchActivity() {
+    const tickets = [{ id: "outage", score: 9, en: "Campus network outage", bn: "ক্যাম্পাস নেটওয়ার্ক বন্ধ" }, { id: "registration", score: 6, en: "Registration deadline issue", bn: "রেজিস্ট্রেশনের সময়সীমার সমস্যা" }, { id: "password", score: 2, en: "Password reset", bn: "পাসওয়ার্ড রিসেট" }, { id: "printer", score: 4, en: "Lab printer jam", bn: "ল্যাবের প্রিন্টার জ্যাম" }];
+    let heap = [], added = new Set(), served = [], note = bn ? "টিকিট যোগ করো, তারপর অনুমান করো কোনটি আগে সমাধান হবে।" : "Add tickets, then predict which one should be handled first.";
+    const view = h("div.heap-story-sim");
+    function draw() {
+      view.replaceChildren(h("div.heap-sim-head", h("b", bn ? "ক্যাম্পাস IT হেল্পডেস্ক" : "Campus IT help desk"), h("span.pill.gold", bn ? "জরুরিতা" : "Urgency")), h("p", bn ? "বেশি score = আগে কাজ। Queue-তে ticket ঢোকাও; max-heap সর্বোচ্চ priority-টি সামনে রাখবে।" : "Higher score means more urgent. Add tickets; the max-heap keeps the highest priority ready."), h("div.heap-ticket-actions", tickets.filter(x => !added.has(x.id)).map(x => h("button.btn.small", { onclick: () => { added.add(x.id); heap.push(x); let i = heap.length - 1; while (i > 0) { const p = Math.floor((i - 1) / 2); if (heap[p].score >= heap[i].score) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } note = `${bn ? "যোগ হলো" : "Added"}: ${bn ? x.bn : x.en} (${x.score}). ${bn ? "Parent-এর সঙ্গে তুলনা করে উপরে উঠেছে কি না দেখো।" : "Notice whether it bubbles up past its parent."}`; draw(); } }, `${x.score} · ${bn ? x.bn : x.en}`))), h("div.heap-array", heap.map((x, i) => h("div.heap-node", h("b", x.score), h("span", bn ? x.bn : x.en), h("small", i === 0 ? (bn ? "সর্বোচ্চ priority" : "ROOT · next") : `index ${i}`)))), h("p.heap-sim-note", note), h("button.btn.primary.small", { disabled: !heap.length, onclick: () => { const x = heap[0]; served.push(x); const last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; while (true) { let m = i, l = 2 * i + 1, r = l + 1; if (l < heap.length && heap[l].score > heap[m].score) m = l; if (r < heap.length && heap[r].score > heap[m].score) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } note = `${bn ? "পরের কাজ" : "Handled next"}: ${bn ? x.bn : x.en} (${x.score}). ${bn ? "শেষের ticket root-এ এসে sift down করেছে।" : "The last ticket moved to the root and sifted down."}`; draw(); } }, bn ? "পরের ticket সমাধান করো" : "Handle highest priority"), served.length ? h("small.heap-served", `${bn ? "সমাধান হয়েছে" : "Handled"}: ${served.map(x => `${bn ? x.bn : x.en} (${x.score})`).join(" → ")}`) : null);
+    }
+    draw(); return view;
   }
 
   function askBlock(ask, onPass, onFail, storyMode = false) {
@@ -144,7 +167,7 @@ function lesson(root, t) {
   const onKey = (e) => { if (/input|textarea/i.test(document.activeElement.tagName)) return; if (e.key === "ArrowRight" && (passed.has(cur) || !steps[cur].ask) && cur < steps.length - 1) go(cur + 1); if (e.key === "ArrowLeft") go(cur - 1); };
   window.addEventListener("keydown", onKey);
   go(cur);
-  return { destroy() { window.removeEventListener("keydown", onKey); lab && lab.destroy(); } };
+  return { destroy() { window.removeEventListener("keydown", onKey); if (window.speechSynthesis) window.speechSynthesis.cancel(); lab && lab.destroy(); } };
 }
 
 /** Input with live math preview. */
