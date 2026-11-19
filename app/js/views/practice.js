@@ -64,7 +64,9 @@ function drill(root, topicId) {
   root.append(host);
   const pool = () => {
     const bank = BANK.filter((q) => q.topic === t.id); const gens = gensForTopic(t.id);
+    const unresolvedMisses = [...new Set(store.state.attempts.filter((a) => a.topic === t.id && !a.ok && a.qid).map((a) => a.qid))].map((id) => bank.find((q) => q.id === id)).filter((q) => q && status(q) !== "solved");
     if (genPref) { const g = GENERATORS.find((x) => x.id === genPref); if (g) return { ...g.make(), topic: g.topic, src: g.name, marks: 2, type: "auto" }; }
+    if (unresolvedMisses.length && Math.random() < 0.55) return unresolvedMisses[Math.floor(Math.random() * unresolvedMisses.length)];
     const unsolved = bank.filter((q) => status(q) !== "solved");
     const roll = Math.random();
     if (unsolved.length && (roll < 0.55 || !gens.length)) return unsolved[Math.floor(Math.random() * unsolved.length)];

@@ -3,12 +3,13 @@ const KEY = "complexlab.v1";
 const DAY = 86400000;
 
 const fresh = () => ({
-  v: 1, lang: "bn", langSet: false, theme: null, created: Date.now(),
+  v: 1, lang: "bn", langSet: false, theme: null, voiceRate: 0.95, created: Date.now(),
   lessons: {},     // topicId -> { step, done, ts }
   mastery: {},     // topicId -> { m: 0..1, n: attempts, last: ts }
   attempts: [],    // { qid, topic, ok, ts, kind }
   cards: {},       // cardId -> { box: 0..5, due: ts, seen }
   feynman: {},     // topicId -> { text, score, ts }
+  recall: {},      // topicId -> { stage: 0..4, due: ts, attempts }
   exams: [],       // { ts, score, total, pct, byTopic, set }
   days: [],        // yyyy-mm-dd study days (streak)
   labsUsed: {},    // labId -> count
@@ -52,7 +53,7 @@ export const store = {
   lessonProgress(topic, step, total, done = false) {
     const cur = state.lessons[topic] || { step: 0, done: false };
     cur.step = Math.max(cur.step || 0, step); cur.total = total; cur.ts = Date.now();
-    if (done && !cur.done) { cur.done = true; const m = state.mastery[topic] || { m: 0.25, n: 0 }; m.m = Math.max(m.m, 0.5); m.last = Date.now(); state.mastery[topic] = m; }
+    if (done && !cur.done) { cur.done = true; const m = state.mastery[topic] || { m: 0.25, n: 0 }; m.m = Math.max(m.m, 0.5); m.last = Date.now(); state.mastery[topic] = m; state.recall ||= {}; state.recall[topic] ||= { stage: 0, due: Date.now() + DAY, attempts: 0 }; }
     state.lessons[topic] = cur; touchDay(); save();
   },
   useLab(id) { state.labsUsed[id] = (state.labsUsed[id] || 0) + 1; touchDay(); save(); },
@@ -64,6 +65,13 @@ export const store = {
     return r.m * Math.pow(0.5, Math.max(0, days - 2) / 21);
   },
   attemptsOf(topic) { return state.attempts.filter((a) => a.topic === topic); },
+
+  gradeRecall(topic, ok) {
+    const r = state.recall?.[topic]; if (!r) return;
+    const gaps = [1, 3, 7, 14]; r.stage = ok ? Math.min(4, r.stage + 1) : 0;
+    r.due = Date.now() + (ok ? gaps[Math.min(r.stage - 1, gaps.length - 1)] : 1) * DAY;
+    r.attempts = (r.attempts || 0) + 1; this.record(topic, ok, { kind: "recall", weight: 0.45 }); save();
+  },
 
   // ---- Leitner spaced repetition for formula / definition cards ----
   cardDue(id) { const c = state.cards[id]; return !c || c.due <= Date.now(); },

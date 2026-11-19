@@ -28,7 +28,7 @@ function lesson(root, t) {
   const saved = store.state.lessons[t.id];
   let cur = Math.min(saved && !saved.done ? saved.step || 0 : 0, steps.length - 1);
   const passed = new Set(Array.from({ length: saved ? (saved.done ? steps.length : saved.step || 0) : 0 }, (_, k) => k));
-  let lab = null, labId = null;
+  let lab = null, labId = null, labGate = null;
   let speech = null;
 
   const stage = h("div.stage.card");
@@ -55,6 +55,14 @@ function lesson(root, t) {
     lab = labById(spec.id).mount(box, { ...(spec.preset || {}), compact: true }); labId = spec.id; store.useLab(spec.id);
   }
 
+  function gateLab(locked) {
+    if (!labId) return;
+    if (locked) {
+      if (!labGate) { labGate = h("div.lab-predict-gate", h("b", bn ? "আগে অনুমান করো" : "Predict first"), h("span", bn ? "পাশের checkpoint-এর উত্তর দাও, তারপর visualizer চালাও।" : "Answer the checkpoint beside this lab to unlock its controls.")); stage.append(labGate); }
+      labGate.hidden = false;
+    } else if (labGate) labGate.hidden = true;
+  }
+
   function renderStepper() {
     stepper.replaceChildren(...steps.map((s, k) => h("button.dot-step", { class: [k === cur ? "on" : "", passed.has(k) ? "done" : ""].join(" "), onclick: () => (k <= Math.max(...passed, 0) + 1 || passed.has(k - 1) || k === 0 ? go(k) : toast(bn ? "আগের ধাপের প্রশ্নটা আগে শেষ করো" : "Finish the checkpoint first")), title: L(s.title) }, h("span", String(k + 1)), h("small", L(s.title)))));
     root.querySelector("#stepCount").textContent = `${T("step")} ${cur + 1} ${T("of")} ${steps.length}`;
@@ -65,6 +73,7 @@ function lesson(root, t) {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     cur = Math.max(0, Math.min(steps.length - 1, k)); const s = steps[cur];
     if (s.lab) mountLab(s.lab); else if (s.feynman && !lab) mountLab(t.steps[t.steps.length - 1].lab);
+    gateLab(Boolean(s.lab && s.ask && !passed.has(cur)));
     panel.replaceChildren(...(s.feynman ? feynmanPanel() : stepPanel(s)));
     store.lessonProgress(t.id, Math.max(...passed, -1) + 1, steps.length);
     renderStepper(); panel.classList.remove("flip"); void panel.offsetWidth; panel.classList.add("flip");
@@ -83,9 +92,9 @@ function lesson(root, t) {
       h("h2.step-title", L(s.title)), rich(s.body, "div", "step-body"),
       s.key ? h("div.key-idea", h("div.ki-head", icon("spark"), T("keyIdea")), rich(s.key)) : null,
       s.story && t.id === "heap" ? heapDispatchActivity() : null,
-      !s.feynman && s.body ? h("button.btn.small.listen-step", { onclick: (e) => speakStep(s, e.currentTarget) }, icon("play"), bn ? "শুনুন" : "Listen to this explanation") : null,
+      !s.feynman && s.body ? voiceControls(s) : null,
     ];
-    if (s.ask) out.push(askBlock(s.ask, () => { passed.add(cur); n.nxt.disabled = false; n.nxt.classList.add("pulse"); renderStepper(); store.record(t.id, true, { kind: "lesson", weight: 0.5 }); }, () => store.record(t.id, false, { kind: "lesson", weight: 0.3 }), s.story));
+    if (s.ask) out.push(askBlock(s.ask, () => { passed.add(cur); gateLab(false); n.nxt.disabled = false; n.nxt.classList.add("pulse"); renderStepper(); store.record(t.id, true, { kind: "lesson", weight: 0.5 }); }, () => store.record(t.id, false, { kind: "lesson", weight: 0.3 }), s.story));
     else passed.add(cur);
     out.push(n.el, h("div.kbd-hint", h("kbd", "←"), h("kbd", "→"), bn ? " ধাপ বদলাও" : " step", " · ", h("button.linkish", { onclick: () => openTutor(bn ? `${L(s.title)} বুঝিয়ে দাও` : `explain ${L(t.title)}`) }, icon("chat"), bn ? " Jarvis-কে জিজ্ঞেস করো" : " ask Jarvis about this")));
     return out;
@@ -95,9 +104,14 @@ function lesson(root, t) {
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) { toast(bn ? "এই browser-এ voice playback নেই" : "Voice playback is not available in this browser"); return; }
     if (speech && window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); speech = null; button.textContent = bn ? "শুনুন" : "Listen to this explanation"; return; }
     const text = `${L(s.title)}. ${L(s.body).replace(/[*`$]/g, " ")} ${s.key ? L(s.key) : ""}`;
-    speech = new SpeechSynthesisUtterance(text); speech.lang = bn ? "bn-BD" : "en-US"; speech.rate = 0.94;
+    speech = new SpeechSynthesisUtterance(text); speech.lang = bn ? "bn-BD" : "en-US"; speech.rate = Number(store.state.voiceRate) || 0.95;
     speech.onend = speech.onerror = () => { speech = null; button.textContent = bn ? "শুনুন" : "Listen to this explanation"; };
     button.textContent = bn ? "থামান" : "Stop listening"; window.speechSynthesis.cancel(); window.speechSynthesis.speak(speech);
+  }
+
+  function voiceControls(s) {
+    const rate = h("select.voice-rate", { "aria-label": bn ? "কথার গতি" : "Speech speed", onchange: (e) => store.set({ voiceRate: Number(e.currentTarget.value) }) }, [0.75, 0.95, 1.15, 1.35].map((v) => h("option", { value: v, selected: Number(store.state.voiceRate || 0.95) === v }, `${v}×`)));
+    return h("div.row.voice-controls", h("button.btn.small.listen-step", { onclick: (e) => speakStep(s, e.currentTarget) }, icon("play"), bn ? "শুনুন" : "Listen"), rate, h("button.btn.small.voice-preview", { onclick: () => { if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return toast(bn ? "এই browser-এ voice playback নেই" : "Voice playback is not available in this browser"); window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(bn ? "এটি কণ্ঠ পরীক্ষার নমুনা।" : "This is a voice preview. You can change the speaking speed."); u.lang = bn ? "bn-BD" : "en-US"; u.rate = Number(store.state.voiceRate) || 0.95; window.speechSynthesis.speak(u); } }, bn ? "কণ্ঠ পরীক্ষা" : "Preview voice"));
   }
 
   function heapDispatchActivity() {
@@ -115,7 +129,7 @@ function lesson(root, t) {
     const box = h(`div.ask${storyMode ? " story-choice" : ""}`, h("div.ask-head", icon(storyMode ? "spark" : "bulb"), storyMode ? (bn ? "গল্পে তোমার সিদ্ধান্ত" : "You choose what happens next") : (bn ? "চেকপয়েন্ট — আগে অনুমান করো" : "Checkpoint — predict before you move on")), rich(ask.q, "div", "ask-q"));
     const pass = () => { box.classList.add("passed"); fb.className = "feedback good"; fb.innerHTML = `${storyMode ? `<b>${bn ? "তোমার সিদ্ধান্তের ফল" : "Your choice changes the scene"}:</b> ` : `✓ <b>${T("correct")}</b> `}${richInline(L(ask.why) || "")}`; onPass(); confetti(box); };
     const fail = (msg) => { tries++; onFail(); fb.className = "feedback bad"; fb.innerHTML = `${T("wrong")} ${msg ? richInline(msg) : ""} ${tries >= 1 && ask.hint ? `<div class="hint">💡 ${richInline(L(ask.hint))}</div>` : ""} ${tries >= 2 ? `<button class="linkish reveal">${bn ? "উত্তর দেখে এগিয়ে যাও" : "Reveal answer & continue"}</button>` : ""}`;
-      const r = fb.querySelector(".reveal"); if (r) r.onclick = () => { fb.className = "feedback info"; fb.innerHTML = `${bn ? "উত্তর" : "Answer"}: ${ask.type === "mcq" ? richInline(L(ask.options[ask.answer])) : ask.fields.map((f) => `${f.label} = <code>${showAns(f)}</code>`).join(", ")} — ${richInline(L(ask.why) || "")}`; passed.add(cur); renderStepper(); panel.querySelector(".next") && (panel.querySelector(".next").disabled = false); };
+      const r = fb.querySelector(".reveal"); if (r) r.onclick = () => { fb.className = "feedback info"; fb.innerHTML = `${bn ? "উত্তর" : "Answer"}: ${ask.type === "mcq" ? richInline(L(ask.options[ask.answer])) : ask.fields.map((f) => `${f.label} = <code>${showAns(f)}</code>`).join(", ")} — ${richInline(L(ask.why) || "")}`; passed.add(cur); gateLab(false); renderStepper(); panel.querySelector(".next") && (panel.querySelector(".next").disabled = false); };
     };
     if (ask.type === "mcq") {
       box.append(h("div.options", ask.options.map((o, k) => h("button.opt", { onclick: (e) => { if (box.classList.contains("passed")) return; if (k === ask.answer) { e.currentTarget.classList.add("right"); pass(); } else { e.currentTarget.classList.add("wrong"); fail(); } }, html: `<span class="opt-k">${"ABCD"[k]}</span>${richInline(L(o))}` }))));

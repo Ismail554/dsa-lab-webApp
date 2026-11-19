@@ -145,7 +145,14 @@ textarea { font: 14px/1.55 var(--font); width: 100%; padding: 10px 12px; border:
 .title-row h1 { margin: 0; }
 .pills { display: flex; gap: 6px; flex-wrap: wrap; }
 .lesson-head .sub { margin: 6px 0 0; }
-.stage { padding: 10px; overflow: hidden; }
+.stage { padding: 10px; overflow: hidden; position: relative; }
+.lab-predict-gate { position: absolute; z-index: 8; inset: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 24px; text-align: center; border: 1px solid var(--line-strong); border-radius: 12px; background: color-mix(in srgb, var(--card) 91%, transparent); backdrop-filter: blur(5px); color: var(--ink); }
+.lab-predict-gate[hidden] { display: none; }
+.lab-predict-gate b { font-size: 19px; }
+.lab-predict-gate span { max-width: 35ch; color: var(--muted); }
+.voice-rate { padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--card); color: var(--ink); font: inherit; }
+.voice-controls { margin: 4px 0 10px; }
+.recall-card { margin-bottom: 14px; }
 .stage-lab { min-height: 470px; }
 .stage-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 4px 0; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); }
 .stepper-card { padding: 14px 16px; }

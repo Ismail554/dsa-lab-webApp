@@ -3,6 +3,7 @@ import { h, L, T, lang, icon, richInline } from "../ui.js";
 import { store } from "../store.js";
 import { TOPICS, topicById } from "../content/curriculum.js";
 import { BANK } from "../content/bank.js";
+import { STORIES } from "../content/stories.js";
 import { gensForTopic } from "../content/generators.js";
 import { pageHead, ring } from "./common.js";
 import { allCards, session } from "./formulas.js";
@@ -16,6 +17,8 @@ export async function render(root) {
   const wrongIds = [...new Set(store.state.attempts.filter((a) => !a.ok && a.qid).map((a) => a.qid))].filter((id) => !solved[id] || solved[id] < (store.state.attempts.filter((a) => a.qid === id && !a.ok).pop()?.ts || 0));
   const mistakes = wrongIds.map((id) => BANK.find((q) => q.id === id)).filter(Boolean);
   const weak = weakTopics().slice(0, 5);
+  const recalls = Object.entries(store.state.recall || {}).filter(([, r]) => r.due <= Date.now()).map(([id]) => id).filter((id) => STORIES[id]?.ask);
+  const recallHost = h("div.recall-host");
 
   root.append(pageHead(T("revise"), bn ? "স্মার্ট রিভিশন" : "Smart revision", bn ? "ভুলে যাওয়ার বক্ররেখা মাথায় রেখে: আজ যা দরকার শুধু সেটাই।" : "Built around the forgetting curve — only what you need today, in priority order."));
   const sprintHost = h("div");
@@ -23,10 +26,22 @@ export async function render(root) {
     h("section.card.pad.rv", h("div.rv-n", String(due.length)), h("h3", bn ? "আজকের ফর্মুলা কার্ড" : "Cards due"), h("p.muted", bn ? "Leitner বক্স অনুযায়ী" : "Leitner spaced repetition"), h("a.btn.primary", { href: "#/formulas" }, bn ? "রিভিউ করো" : "Review cards")),
     h("section.card.pad.rv", h("div.rv-n", String(mistakes.length)), h("h3", bn ? "আগের ভুল" : "Mistakes to redo"), h("p.muted", bn ? "যেগুলো ভুল হয়েছিল, এখনো ঠিক হয়নি" : "Wrong before, not yet fixed"), mistakes.length ? h("a.btn", { href: `#/practice/q/${mistakes[0].id}` }, bn ? "প্রথমটা দিয়ে শুরু" : "Start with the first") : null),
     h("section.card.pad.rv", h("div.rv-n", String(weak.length)), h("h3", T("weak")), h("p.muted", bn ? "দক্ষতা কম বা অনেকদিন অনুশীলন হয়নি" : "Low mastery or fading from memory"), h("button.btn.primary", { onclick: () => sprint(sprintHost, due, mistakes, weak, bn) }, icon("play"), bn ? " ১০ মিনিটের স্প্রিন্ট" : " 10-minute sprint"))),
+    h("section.card.pad recall-card", h("h3", bn ? "দ্রুত মনে করো" : "Quick lesson recall"), h("p.muted", bn ? "আগে শেখা বিষয় থেকে ছোট প্রশ্ন" : "Short retrieval checks for completed lessons"), recalls.length ? h("button.btn.primary", { onclick: () => recallSession(recallHost, recalls, bn) }, bn ? "শুরু করো" : "Start recall", ` · ${recalls.length}`) : h("span.pill.green", bn ? "সব আপ টু ডেট" : "All caught up")),
     sprintHost,
+    recallHost,
     h("section.card.pad", h("h3", bn ? "অগ্রাধিকার তালিকা" : "Priority list"),
       h("div.weak-list", weak.map((w) => { const t = topicById(w.id); return h("div.weak-row", ring(w.m, 40), h("div.grow", h("b", L(t.title)), h("small", w.reason)), h("a.btn.small", { href: `#/learn/${t.id}` }, bn ? "লেসন" : "Lesson"), h("a.btn.small.primary", { href: `#/practice/topic/${t.id}` }, bn ? "ড্রিল" : "Drill")); }))),
     mistakes.length ? h("section.card.pad", h("h3", bn ? "ভুলগুলো" : "Your mistakes"), h("div.qlist", mistakes.map((q) => h("a.qrow", { href: `#/practice/q/${q.id}` }, h("span.qstat.tried", "!"), h("span.qsrc", q.src), h("span.qtext", { html: richInline(q.q.slice(0, 140)) }))))) : null);
+}
+
+function recallSession(host, ids, bn) {
+  let i = 0;
+  const show = () => {
+    if (i >= ids.length) { host.replaceChildren(h("section.card.pad", bn ? "Recall শেষ — ভালো কাজ!" : "Recall complete — nice work.")); return; }
+    const id = ids[i++], ask = STORIES[id].ask, feedback = h("div.feedback"), next = h("button.btn.primary", { disabled: true, onclick: show }, bn ? "পরের recall →" : "Next recall →"); let answered = false;
+    host.replaceChildren(h("section.card.pad", h("b", `Recall ${i}/${ids.length}`), h("p.ask-q", L(ask.q)), h("div.options", ask.options.map((o, k) => h("button.opt", { onclick: (e) => { if (answered) return; answered = true; const ok = k === ask.answer; e.currentTarget.classList.add(ok ? "right" : "wrong"); store.gradeRecall(id, ok); feedback.className = `feedback ${ok ? "good" : "bad"}`; feedback.innerHTML = `${ok ? "✓" : "↻"} ${richInline(L(ask.why) || "")}`; next.disabled = false; }, html: `<span class="opt-k">${"ABCD"[k]}</span>${richInline(L(o))}` }))), feedback, next));
+  };
+  show(); host.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function sprint(host, due, mistakes, weak, bn) {
