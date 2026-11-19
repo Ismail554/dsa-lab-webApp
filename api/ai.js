@@ -1,0 +1,50 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const MODEL = () => process.env.GEMINI_MODEL || "gemini-2.5-flash";
+
+export default async function ai(request, response) {
+  response.setHeader("Cache-Control", "no-store");
+  if (request.method !== "POST") return response.status(405).json({ error: "Method not allowed" });
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return response.status(503).json({ error: "AI tutor unavailable: add GEMINI_API_KEY in Vercel Environment Variables and redeploy." });
+
+  try {
+    const body = typeof request.body === "string" ? JSON.parse(request.body || "{}") : (request.body || {});
+    const messages = Array.isArray(body.messages) ? body.messages.slice(-16) : [];
+    if (!messages.length || messages[0].role !== "user") return response.status(400).json({ error: "messages must start with a user turn" });
+
+    const contents = messages.map((message) => ({
+      role: message.role === "assistant" ? "model" : "user",
+      parts: [{ text: String(message.content || "") }],
+    }));
+    let instructions = "";
+    try { instructions = readFileSync(join(process.cwd(), "tutor-instructions.md"), "utf8").replace(/<!--[\s\S]*?-->/g, "").trim(); } catch {}
+    const system = [
+      instructions || "You are Jarvis, a patient Socratic tutor for CSE 2205 Data Structures and Algorithms II. Teach in the student's language, one guiding question at a time, and trace algorithms step by step.",
+      `## এই মুহূর্তের প্রসঙ্গ (app context)\n${String(body.system || "(none)")}`,
+    ].join("\n\n");
+    const model = MODEL();
+    const result = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents,
+        generationConfig: { temperature: 0.6, maxOutputTokens: Math.min(Math.max(Number(body.max_tokens) || 2000, 1024), 8000) },
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+    const data = await result.json().catch(() => ({}));
+    if (!result.ok) {
+      const status = [400, 401, 403, 429].includes(result.status) ? 503 : 502;
+      return response.status(status).json({ error: result.status === 401 || result.status === 403 ? "Gemini rejected the configured API key." : data.error?.message || `Gemini request failed (${result.status})` });
+    }
+    const text = (data.candidates?.[0]?.content?.parts || []).filter((part) => !part.thought).map((part) => part.text || "").join("").trim();
+    if (!text) return response.status(502).json({ error: "Gemini returned an empty response." });
+    return response.status(200).json({ text, provider: "gemini" });
+  } catch (error) {
+    const status = error.name === "TimeoutError" || error.name === "AbortError" ? 504 : 500;
+    return response.status(status).json({ error: status === 504 ? "Gemini request timed out." : "AI tutor request failed." });
+  }
+}
