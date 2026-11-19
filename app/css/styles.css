@@ -171,6 +171,13 @@ textarea { font: 14px/1.55 var(--font); width: 100%; padding: 10px 12px; border:
 .ki-head { display: flex; gap: 6px; align-items: center; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; color: var(--violet-ink); }
 .ask { margin: 12px 0; padding: 12px; border: 1.5px dashed var(--ink); border-radius: 12px; background: var(--paper-2); transition: background .3s; }
 .ask.passed { border-style: solid; background: color-mix(in srgb, var(--green) 45%, var(--card)); }
+.story-choice { border-style: solid; border-color: color-mix(in srgb, var(--rust) 45%, var(--line)); background: color-mix(in srgb, var(--gold-soft) 25%, var(--paper-2)); }
+.story-choice .ask-head { color: var(--rust); }
+.story-choice .options { grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); }
+.story-choice .opt { min-height: 54px; }
+.story-choice.passed .opt:not(.right) { opacity: .62; }
+.feynman-guide { margin: 10px 0; padding: 9px 12px; border-left: 3px solid var(--green-3); border-radius: 0 9px 9px 0; background: color-mix(in srgb, var(--green) 35%, var(--card)); color: var(--ink-2); font-size: 12px; }
+.revise-explanation { margin: 8px 0; }
 .ask-head { display: flex; gap: 6px; align-items: center; font-size: 11px; font-weight: 800; color: var(--rust); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
 .ask-q { font-weight: 600; margin-bottom: 8px; }
 .options { display: grid; gap: 7px; }

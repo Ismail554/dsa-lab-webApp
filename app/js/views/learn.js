@@ -81,16 +81,16 @@ function lesson(root, t) {
       h("h2.step-title", L(s.title)), rich(s.body, "div", "step-body"),
       s.key ? h("div.key-idea", h("div.ki-head", icon("spark"), T("keyIdea")), rich(s.key)) : null,
     ];
-    if (s.ask) out.push(askBlock(s.ask, () => { passed.add(cur); n.nxt.disabled = false; n.nxt.classList.add("pulse"); renderStepper(); store.record(t.id, true, { kind: "lesson", weight: 0.5 }); }, () => store.record(t.id, false, { kind: "lesson", weight: 0.3 })));
+    if (s.ask) out.push(askBlock(s.ask, () => { passed.add(cur); n.nxt.disabled = false; n.nxt.classList.add("pulse"); renderStepper(); store.record(t.id, true, { kind: "lesson", weight: 0.5 }); }, () => store.record(t.id, false, { kind: "lesson", weight: 0.3 }), s.story));
     else passed.add(cur);
     out.push(n.el, h("div.kbd-hint", h("kbd", "←"), h("kbd", "→"), bn ? " ধাপ বদলাও" : " step", " · ", h("button.linkish", { onclick: () => openTutor(bn ? `${L(s.title)} বুঝিয়ে দাও` : `explain ${L(t.title)}`) }, icon("chat"), bn ? " Jarvis-কে জিজ্ঞেস করো" : " ask Jarvis about this")));
     return out;
   }
 
-  function askBlock(ask, onPass, onFail) {
+  function askBlock(ask, onPass, onFail, storyMode = false) {
     const fb = h("div.feedback"); let tries = 0;
-    const box = h("div.ask", h("div.ask-head", icon("bulb"), bn ? "চেকপয়েন্ট — আগে অনুমান করো" : "Checkpoint — predict before you move on"), rich(ask.q, "div", "ask-q"));
-    const pass = () => { box.classList.add("passed"); fb.className = "feedback good"; fb.innerHTML = `✓ <b>${T("correct")}</b> ${richInline(L(ask.why) || "")}`; onPass(); confetti(box); };
+    const box = h(`div.ask${storyMode ? " story-choice" : ""}`, h("div.ask-head", icon(storyMode ? "spark" : "bulb"), storyMode ? (bn ? "গল্পে তোমার সিদ্ধান্ত" : "You choose what happens next") : (bn ? "চেকপয়েন্ট — আগে অনুমান করো" : "Checkpoint — predict before you move on")), rich(ask.q, "div", "ask-q"));
+    const pass = () => { box.classList.add("passed"); fb.className = "feedback good"; fb.innerHTML = `${storyMode ? `<b>${bn ? "তোমার সিদ্ধান্তের ফল" : "Your choice changes the scene"}:</b> ` : `✓ <b>${T("correct")}</b> `}${richInline(L(ask.why) || "")}`; onPass(); confetti(box); };
     const fail = (msg) => { tries++; onFail(); fb.className = "feedback bad"; fb.innerHTML = `${T("wrong")} ${msg ? richInline(msg) : ""} ${tries >= 1 && ask.hint ? `<div class="hint">💡 ${richInline(L(ask.hint))}</div>` : ""} ${tries >= 2 ? `<button class="linkish reveal">${bn ? "উত্তর দেখে এগিয়ে যাও" : "Reveal answer & continue"}</button>` : ""}`;
       const r = fb.querySelector(".reveal"); if (r) r.onclick = () => { fb.className = "feedback info"; fb.innerHTML = `${bn ? "উত্তর" : "Answer"}: ${ask.type === "mcq" ? richInline(L(ask.options[ask.answer])) : ask.fields.map((f) => `${f.label} = <code>${showAns(f)}</code>`).join(", ")} — ${richInline(L(ask.why) || "")}`; passed.add(cur); renderStepper(); panel.querySelector(".next") && (panel.querySelector(".next").disabled = false); };
     };
@@ -123,6 +123,7 @@ function lesson(root, t) {
       if (sc.avgLen > 28) tips.push(bn ? "বাক্য ছোট করো।" : "Shorter sentences — simplicity is the goal.");
       result.replaceChildren(h("div.fr-top", ring(sc.score / 100, 64), h("div", h("b", sc.score >= 80 ? (bn ? "চমৎকার! তুমি এটা পড়াতে পারবে।" : "Excellent — you could teach this.") : sc.score >= 60 ? (bn ? "ভালো! কয়েকটা ফাঁক আছে।" : "Good — a few gaps to close.") : bn ? "আবার চেষ্টা করো — ফাঁকগুলো দেখো।" : "Keep going — see the gaps below."), h("small", `${sc.words} ${bn ? "শব্দ" : "words"}`))),
         h("ul.concepts", concepts), tips.length ? h("div.tips", h("b", bn ? "উন্নতির উপায়:" : "To improve:"), h("ul", tips.map((x) => h("li", x)))) : null,
+        h("button.btn.small.revise-explanation", { onclick: () => { ta.focus(); ta.scrollIntoView({ behavior: "smooth", block: "center" }); } }, icon("edit"), bn ? "ফাঁকগুলো পূরণ করে আবার দেখো" : "Revise your explanation and check again"),
         ai.status && ai.status.ai ? h("button.btn.small", { onclick: (e) => aiCritique(text, e.currentTarget) }, icon("spark"), bn ? " Jarvis-এর (AI) মতামত" : " Get Jarvis's AI critique") : null);
       if (sc.score >= 60) { passed.add(cur); store.lessonProgress(t.id, steps.length, steps.length, true); renderStepper(); confetti(result); }
     };
@@ -134,7 +135,7 @@ function lesson(root, t) {
     return [
       h("div.step-top", h("span.step-k", `${T("step").toUpperCase()} ${cur + 1} / ${steps.length}`), tagPill("feynman")),
       h("h2.step-title", T("explainBack")),
-      h("div.step-body", h("p", { html: richInline(bn ? "**Feynman পদ্ধতি:** যদি সহজ ভাষায় বোঝাতে না পারো, তাহলে এখনো পুরোপুরি বোঝোনি। নিচের প্রশ্নের উত্তর নিজের ভাষায় লিখো:" : "**Feynman technique:** if you can't explain it simply, you don't understand it yet. Answer in your own words:") }), h("blockquote", L(t.feynman.prompt))),
+      h("div.step-body", h("p", { html: richInline(bn ? "**Feynman পদ্ধতি:** যদি সহজ ভাষায় বোঝাতে না পারো, তাহলে এখনো পুরোপুরি বোঝোনি। নিজের ভাষায় বোঝাও, তারপর score-এর ফাঁকগুলো পূরণ করে আবার চেষ্টা করো:" : "**Feynman technique:** explain the idea simply in your own words, then use the feedback to fill gaps and try again." ) }), h("blockquote", L(t.feynman.prompt)), h("p.feynman-guide", bn ? "ভাবো: এটা কী সমস্যার সমাধান করে? ছোট একটা উদাহরণে কী ঘটে? কোন অবস্থায় এই কৌশলটি কাজ নাও করতে পারে?" : "As you explain, ask yourself: What problem does it solve? What happens in a tiny example? When might this approach fail?")),
       ta, h("div.row", h("button.btn.primary", { onclick: evaluate }, icon("check"), bn ? " মূল্যায়ন করো" : " Evaluate my explanation"), h("a.btn", { href: `#/practice/topic/${t.id}` }, bn ? "পরীক্ষার অনুশীলন →" : "Exam drill →")),
       result, nav(false).el,
     ];
