@@ -23,6 +23,15 @@ No build step: the app is plain ES modules served by `server.mjs`. (Port 5174, s
 | **Jarvis tutor** | Gemini-powered when the key is set, otherwise an offline Socratic tutor. The offline tutor has built-in tools: `T(n)=2T(n/2)+n log n` (Master Theorem solver), `bigo 3n^2+5n log n` (gives the tight bound), `heap 4 10 3 5 1` (builds a heap). |
 | **Library & Upload** | Drop `.md .pdf .txt .tex .html` files into `dsa-lab/materials/`, or upload them on the Library page. They are analysed and linked to topics. Future topics such as hashing, red-black trees, Floyd–Warshall, network flow, backtracking and NP-completeness appear as new map nodes. `.md` files in `D:\2205_DSA` are picked up too. |
 
+## Algo Lab–style upgrades
+
+Ideas taken from [Algo Lab](https://byte-sized-algorithms.vercel.app) (its source is not public; this is our own code):
+
+* **Live pseudocode:** every animated algorithm (34 of them) shows its pseudocode, and the lines running at the current step light up. `tests/pseudo.test.mjs` checks every step maps to real lines.
+* **State box:** each step shows the named state: queue, call stack, finalised vertices, pivot and i/j, current DP cell, load factor and so on.
+* **3D blocks:** nodes, arrays, bars and B-tree nodes are drawn as isometric-style blocks on an isometric grid; the active block gets hatched sides.
+* **New lab and lessons:** a Stacks, Queues, Lists, Hashing & Tries lab, topological sort in the graph lab, and 5 "Extra" lessons (beyond the syllabus) with stories, 14 questions and 6 generators.
+
 ## AI tutor (Gemini) and custom instructions
 
 * `dsa-lab/.env` holds `GEMINI_API_KEY=...`. It is the same key as Complex Lab and is git-ignored. Only the server reads it.
@@ -35,4 +44,4 @@ No build step: the app is plain ES modules served by `server.mjs`. (Port 5174, s
 npm test
 ```
 
-Runs the logic checks. They cover the complexity parser and the answer checker, the algorithms (heaps, AVL, sorts, Huffman, LCS, matrix chain), and the stored answers: every bank question, every lesson checkpoint, and 60 runs of every generator.
+Runs the logic checks and the pseudocode-mapping check. They cover the complexity parser and the answer checker, the algorithms (heaps, AVL, sorts, Huffman, LCS, matrix chain), and the stored answers: every bank question, every lesson checkpoint, and 60 runs of every generator.

@@ -1,3 +1,4 @@
+import { EXTRA_BANK } from "./extra-bank.js";
 // Exam question bank for CSE 2205: the practice questions from the class notes + exam-style questions per week.
 // type "auto": answer fields are auto-checked (numbers, complexity classes, arrays/sequences).
 // type "theory": definitions / explanations / code — graded against key points, with a model answer.
@@ -167,5 +168,7 @@ export const BANK = [
   A("dp5", "fin", "dp-apps", "CLRS classic", "Matrix chain with dimensions 30, 35, 15, 5, 10, 20, 25: minimum scalar multiplications?", [f("cost", "15125", "num")], ["Fill m[i][j] by chain length; optimal order $((A_1(A_2A_3))((A_4A_5)A_6))$.", "15125."], { lab: { id: "dp", preset: { mode: "mcm", dims: [30, 35, 15, 5, 10, 20, 25] } } }),
   A("dp6", "fin", "dp-apps", "Exam style", "Time complexity of the LCS DP for strings of lengths m and n?", [f("T", "mn", "text", { show: "Θ(mn)", alt: ["m*n", "n*m", "nm", "o(mn)", "θ(mn)", "o(m*n)", "θ(m*n)", "o(nm)", "θ(nm)"] })], ["One O(1) cell per pair (i, j)."]),
 ];
+
+BANK.push(...EXTRA_BANK);
 
 export const bankById = (id) => BANK.find((q) => q.id === id);

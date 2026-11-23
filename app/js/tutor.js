@@ -38,6 +38,11 @@ export const KEYWORDS = {
   "search-sort": ["binary search", "counting sort", "lower bound for sorting", "decision tree", "insertion sort", "searching"],
   greedy: ["greedy", "activity selection", "fractional knapsack", "huffman", "prefix code", "গ্রিডি"],
   "dp-basics": ["dynamic programming", "memoization", "memoisation", "tabulation", "fibonacci", "overlapping", "optimal substructure", "top-down", "bottom-up"],
+  stackqueue: ["stack", "queue", "push", "pop", "enqueue", "dequeue", "lifo", "fifo", "circular queue"],
+  linkedlist: ["linked list", "linkedlist", "node.next", "reverse a list", "singly", "doubly"],
+  hashing: ["hash", "hashing", "collision", "chaining", "linear probing", "load factor", "hash table"],
+  trie: ["trie", "prefix tree", "autocomplete"],
+  topo: ["topological", "topo sort", "in-degree", "indegree", "kahn", "dag"],
   "dp-apps": ["0/1 knapsack", "knapsack", "lcs", "longest common subsequence", "matrix chain", "matrix-chain", "mcm"],
 };
 export function detectTopic(text) {

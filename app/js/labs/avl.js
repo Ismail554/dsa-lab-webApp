@@ -20,12 +20,21 @@ export default {
         cls: (n) => [f.hl?.includes(n.k) ? "hl" : "", f.bad?.includes(n.k) ? "bad" : "", Math.abs(bf(n)) > 1 ? "bad" : ""].join(" ") });
       ui.view.replaceChildren(svg); info(f.t);
     };
-    const P = player(ui, draw);
+    const P = player(ui, draw, { state: (f) => {
+      const bn = lang() === "bn"; const en = (f.msg && f.msg.en) || "";
+      const kase = (en.match(/\b(LL|RR|LR|RL) case/) || [])[1];
+      return [
+        { label: bn ? "Insert ক্রম" : "Insert order", items: s.keys },
+        f.hl && f.hl.length ? { label: bn ? "এখন" : "Now at", items: f.hl, tone: "hot" } : null,
+        kase ? { label: "Case", items: [kase], tone: "bad" } : null,
+        { label: "height", items: [heightOf(f.t)] },
+      ];
+    } });
     function rebuild(showLast = true) {
       const prev = s.keys.slice(0, -1); const last = s.keys[s.keys.length - 1];
       const base = avlBuild(prev, { balance: s.balance }).tree;
       if (!showLast || last === undefined) { tree = avlBuild(s.keys, { balance: s.balance }).tree; P.load([{ t: tree, msg: { en: "Empty tree — insert a key.", bn: "খালি tree — একটা key insert করো।" } }]); return; }
-      const r = avlInsert(base, last, { balance: s.balance }); tree = r.result; P.load(r.frames);
+      const r = avlInsert(base, last, { balance: s.balance }); tree = r.result; P.load(r.frames, 0, s.balance ? "avl" : "bst");
     }
     const keysIn = inputRow(bn ? "key ক্রম, যেমন 10 20 30" : "key sequence, e.g. 10 20 30", s.keys.join(", "), bn ? "বানাও" : "Build", (v) => { s.keys = parseNums(v, 15); rebuild(); });
     const addIn = inputRow(bn ? "নতুন key" : "next key", s.next, "Insert", (v, inp) => { const x = parseNums(v)[0]; if (x === undefined || s.keys.includes(x)) return; s.keys.push(x); keysIn.input.value = s.keys.join(", "); inp.value = ri(1, 99); rebuild(); });

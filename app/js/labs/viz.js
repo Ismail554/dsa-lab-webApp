@@ -1,5 +1,6 @@
 // Visual toolkit for the DSA labs: SVG builder, frame player, array strips, tree & graph drawing.
 import { h, L, icon, lang } from "../ui.js";
+import { PSEUDO, annotate } from "./pseudo.js";
 
 const NS = "http://www.w3.org/2000/svg";
 /** S("rect", {x, y}, ...kids) — SVG element builder */
@@ -9,7 +10,23 @@ export function S(tag, attrs = {}, ...kids) {
   for (const k of kids.flat(Infinity)) if (k != null && k !== false) el.append(k instanceof Node ? k : document.createTextNode(String(k)));
   return el;
 }
-export function svgBox(w, hh, cls = "") { return S("svg", { viewBox: `0 0 ${w} ${hh}`, class: `viz-svg ${cls}`, preserveAspectRatio: "xMidYMid meet", role: "img" }); }
+export function svgBox(w, hh, cls = "") {
+  const svg = S("svg", { viewBox: `0 0 ${w} ${hh}`, class: `viz-svg ${cls}`, preserveAspectRatio: "xMidYMid meet", role: "img" });
+  svg.append(S("defs", {}, S("pattern", { id: "hatch", width: 6, height: 6, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" }, S("rect", { width: 6, height: 6, class: "hatch-bg" }), S("line", { x1: 0, y1: 0, x2: 0, y2: 6, class: "hatch-ln" }))));
+  return svg;
+}
+
+/** 3D block (oblique projection): front rect + top face + right face, depth d. Drop-in for S("rect", attrs). */
+export function isoRect(attrs, d = 7) {
+  const x = +attrs.x || 0, y = +attrs.y || 0, w = +attrs.width, hh = +attrs.height;
+  const pt = (...p) => p.map(([a, b]) => `${a},${b}`).join(" ");
+  return S("g", { class: `iso ${attrs.class || ""}` },
+    S("polygon", { class: "iso-top", points: pt([x, y], [x + d, y - d], [x + w + d, y - d], [x + w, y]) }),
+    S("polygon", { class: "iso-side", points: pt([x + w, y], [x + w + d, y - d], [x + w + d, y + hh - d], [x + w, y + hh]) }),
+    S("rect", { class: "iso-front", x, y, width: w, height: hh }));
+}
+/** Cube centred on (0,0) with half-size r. */
+export const cube = (r) => isoRect({ x: -r, y: -r * 0.8, width: 2 * r, height: 1.8 * r }, r * 0.6);
 
 /** Standard lab layout: stage (viz area + message bar + player) | side panel. */
 export function vshell(host, preset = {}) {
@@ -17,16 +34,38 @@ export function vshell(host, preset = {}) {
   const view = h("div.viz-view"); const msgBar = h("div.viz-msg"); const bar = h("div.viz-bar");
   const stage = h("div.lab-stage.viz-stage", view, msgBar, bar);
   const controls = h("div.lab-controls"); const info = h("div.lab-info");
-  host.append(stage, h("div.lab-panel", controls, info));
-  return { stage, view, msgBar, bar, controls, info };
+  const state = h("div.state-box"); const code = h("div.code-box");
+  host.append(stage, h("div.lab-panel", controls, state, code, info));
+  return { stage, view, msgBar, bar, controls, info, state, code };
+}
+
+/** Pseudocode panel with the running lines highlighted. */
+export function renderCode(box, key, ln = []) {
+  const P = key && PSEUDO[key];
+  if (!P) { box.replaceChildren(); box.hidden = true; return; }
+  box.hidden = false;
+  const bn = lang() === "bn";
+  box.replaceChildren(h("div.box-head", h("span.box-ico", "⌨"), bn ? "Pseudocode — এখন যে লাইন চলছে" : "Pseudocode — the lines running now"),
+    h("ol.code-lines", P.lines.map((t, k) => h("li", { class: ln.includes(k + 1) ? "on" : "" }, h("code", t || " ")))));
+  const on = box.querySelector("li.on"); if (on && box.scrollHeight > box.clientHeight) on.scrollIntoView({ block: "nearest" });
+}
+
+/** State box: [{ label:{en,bn}|string, items:[...], tone?, note? }] */
+export function renderState(box, rows) {
+  rows = (rows || []).filter(Boolean);
+  if (!rows.length) { box.replaceChildren(); box.hidden = true; return; }
+  box.hidden = false;
+  box.replaceChildren(...rows.map((r) => h(`div.state-row${r.tone ? "." + r.tone : ""}`,
+    h("span.state-l", L(r.label)), r.note ? h("small.state-n", L(r.note)) : null,
+    h("span.state-items", (r.items && r.items.length ? r.items : ["∅"]).map((x) => h("b.chipbox", String(x)))))));
 }
 
 /**
  * Frame player. frames: [{msg:{en,bn}, ...}], draw(frame, index).
  * Returns { load(frames, at), go(i), destroy(), get i() }
  */
-export function player(ui, draw, { speed = 1, autoplay = false } = {}) {
-  let frames = [], i = 0, timer = null, sp = speed;
+export function player(ui, draw, { speed = 1, autoplay = false, state = null } = {}) {
+  let frames = [], i = 0, timer = null, sp = speed, codeKey = null, stateFn = state;
   const bn = () => lang() === "bn";
   const pos = h("input.viz-pos", { type: "range", min: 0, max: 0, value: 0, step: 1 });
   const count = h("span.viz-count");
@@ -47,11 +86,14 @@ export function player(ui, draw, { speed = 1, autoplay = false } = {}) {
     const f = frames[i]; ui.msgBar.innerHTML = ""; ui.msgBar.append(h("b", `${bn() ? "ধাপ" : "Step"} ${i + 1}: `), L(f.msg) || "");
     ui.msgBar.classList.toggle("done", !!f.done);
     draw(f, i);
+    if (ui.code) renderCode(ui.code, codeKey, f.ln || []);
+    if (ui.state) renderState(ui.state, stateFn ? stateFn(f, i) : []);
   }
   function play() { if (i >= frames.length - 1) go(0); playBtn.replaceChildren(icon("pause")); timer = setInterval(() => { if (i >= frames.length - 1) return stop(); go(i + 1); }, 900 / sp); }
   function stop() { clearInterval(timer); timer = null; playBtn.replaceChildren(icon("play")); }
   return {
-    load(fr, at = 0) { stop(); frames = fr || []; pos.max = Math.max(0, frames.length - 1); go(at === "end" ? frames.length - 1 : at); if (autoplay) play(); },
+    setState(fn) { stateFn = fn; },
+    load(fr, at = 0, key = null) { stop(); codeKey = key; frames = annotate(key, fr || []); pos.max = Math.max(0, frames.length - 1); go(at === "end" ? frames.length - 1 : at); if (autoplay) play(); },
     go, play, stop, get i() { return i; }, get n() { return frames.length; },
     destroy() { stop(); },
   };
@@ -73,7 +115,7 @@ export function layoutBinary(root, { left = (n) => n.l, right = (n) => n.r } = {
 }
 
 /** Draw a binary tree into an SVG. nodes: layout items; label(n), cls(n) */
-export function drawBinary(svg, lay, { label = (n) => n.k, cls = () => "", sub = null, W = 640, H = 360, r = 18 } = {}) {
+export function drawBinary(svg, lay, { label = (n) => n.k, cls = () => "", sub = null, W = 640, H = 360, r = 21 } = {}) {
   const pos = new Map(); const cols = Math.max(1, lay.width); const rows = Math.max(1, lay.depth + 1);
   const dx = Math.min(70, (W - 40) / cols), dy = Math.min(78, (H - 50) / rows);
   const ox = (W - dx * (cols - 1)) / 2;
@@ -82,7 +124,7 @@ export function drawBinary(svg, lay, { label = (n) => n.k, cls = () => "", sub =
   lay.items.forEach((it) => { if (it.parent) { const [x1, y1] = pos.get(it.parent), [x2, y2] = pos.get(it.node); g.append(S("line", { x1, y1, x2, y2, class: "t-edge" })); } });
   lay.items.forEach((it) => {
     const [x, y] = pos.get(it.node);
-    g.append(S("g", { class: `t-node ${cls(it.node)}`, transform: `translate(${x},${y})` }, S("circle", { r }), S("text", { "text-anchor": "middle", dy: "0.35em" }, String(label(it.node))), sub ? S("text", { class: "t-sub", "text-anchor": "middle", y: r + 13 }, sub(it.node)) : null));
+    g.append(S("g", { class: `t-node ${cls(it.node)}`, transform: `translate(${x},${y})` }, cube(r * 0.92), S("text", { "text-anchor": "middle", dy: "0.35em" }, String(label(it.node))), sub ? S("text", { class: "t-sub", "text-anchor": "middle", y: r + 13 }, sub(it.node)) : null));
   });
   svg.append(g); return pos;
 }
@@ -97,7 +139,7 @@ export function heapTree(a, n = a.length) {
 /** Draw a graph. G = {n, edges, pos:[[x,y]], labels, directed}. State: vis[], cur, edge, tree[], reject, dist[] */
 export function drawGraph(svg, G, st = {}, { W = 640, H = 380, weights = true, sub = null } = {}) {
   const P = G.pos.map(([x, y]) => [30 + x * (W - 60), 30 + y * (H - 60)]);
-  const r = 19;
+  const r = 23;
   svg.append(S("defs", {}, S("marker", { id: "garr", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, S("path", { d: "M0 0L10 5L0 10z", class: "g-arrow" }))));
   G.edges.forEach((e, idx) => {
     const [x1, y1] = P[e.u], [x2, y2] = P[e.v]; const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
@@ -108,7 +150,7 @@ export function drawGraph(svg, G, st = {}, { W = 640, H = 380, weights = true, s
   });
   P.forEach(([x, y], k) => {
     const c = [(st.vis || []).includes(k) ? "vis" : "", st.cur === k ? "cur" : "", (st.fin || []).includes(k) ? "fin" : ""].join(" ");
-    svg.append(S("g", { class: `g-node ${c}`, transform: `translate(${x},${y})` }, S("circle", { r }), S("text", { "text-anchor": "middle", dy: "0.35em" }, (G.labels || "ABCDEFGHIJ")[k]),
+    svg.append(S("g", { class: `g-node ${c}`, transform: `translate(${x},${y})` }, cube(r * 0.92), S("text", { "text-anchor": "middle", dy: "0.35em" }, (G.labels || "ABCDEFGHIJ")[k]),
       sub ? S("text", { class: "g-sub", "text-anchor": "middle", y: -r - 6 }, sub(k)) : null));
   });
   return P;
@@ -119,7 +161,7 @@ export function bars(svg, a, { W = 640, H = 300, cls = () => "", max = Math.max(
   const n = a.length; const bw = (W - 40) / n;
   a.forEach((v, k) => {
     const hh = 24 + ((H - 70) * v) / max; const x = 20 + k * bw, y = H - 30 - hh;
-    svg.append(S("g", { class: `bar ${cls(k)}` }, S("rect", { x: x + 3, y, width: bw - 6, height: hh, rx: 5 }), S("text", { x: x + bw / 2, y: y - 6, "text-anchor": "middle" }, String(v)), S("text", { class: "bar-i", x: x + bw / 2, y: H - 12, "text-anchor": "middle" }, String(k))));
+    svg.append(S("g", { class: `bar ${cls(k)}` }, isoRect({ x: x + 3, y, width: bw - 10, height: hh }, Math.min(9, bw * 0.18)), S("text", { x: x + bw / 2, y: y - 6, "text-anchor": "middle" }, String(v)), S("text", { class: "bar-i", x: x + bw / 2, y: H - 12, "text-anchor": "middle" }, String(k))));
   });
 }
 

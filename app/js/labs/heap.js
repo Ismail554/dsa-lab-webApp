@@ -23,14 +23,22 @@ export default {
       svg.addEventListener("click", (e) => { const g = e.target.closest(".t-node"); if (!g || s.op !== "view") return; const idx = [...svg.querySelectorAll(".t-node")].indexOf(g); const lay = layoutBinary(heapTree(a)).items; s.sel = lay[idx].node.i; draw(cur); info(); });
       ui.view.replaceChildren(svg, arrayStrip(a, { hl: f.hl || [], ok: f.ok || [], swap: f.swap || [], one: s.one, dim: (k) => k >= n, mark: s.op === "view" ? { [s.sel]: "sel" } : {} }));
     };
-    const P = player(ui, draw);
+    const P = player(ui, draw, { state: (f) => {
+      const n = f.n ?? f.a.length; const bn = lang() === "bn";
+      return [
+        { label: bn ? "Heap অংশ" : "Heap part", items: f.a.slice(0, n) },
+        n < f.a.length ? { label: bn ? "Sorted (স্থায়ী)" : "Sorted (final)", items: f.a.slice(n), tone: "ok" } : null,
+        f.hl && f.hl.length && s.op !== "view" ? { label: bn ? "এখন দেখছি" : "Looking at", items: f.hl.filter((i) => i < f.a.length).map((i) => `a[${i}]=${f.a[i]}`), tone: "hot" } : null,
+        f.swap ? { label: "Swap", items: f.swap.map((i) => `a[${i}]`), tone: "hot" } : null,
+      ];
+    } });
     function run() {
       const a = s.arr;
       if (s.op === "view") P.load([{ a, msg: { en: `Level order → array. Click a node to see its parent and children indices. This array is a ${heapKind(a)} heap.`, bn: `Level order → array। Node এ ক্লিক করে parent ও children এর index দেখো। এই array টা: ${heapKind(a)} heap।` } }]);
-      else if (s.op === "insert") P.load(heapInsert(a, s.value, s.type).frames);
-      else if (s.op === "extract") P.load(heapExtract(a, s.type).frames);
-      else if (s.op === "build") P.load(buildHeap(a, s.type).frames);
-      else if (s.op === "sort") P.load(heapSort(a).frames);
+      else if (s.op === "insert") P.load(heapInsert(a, s.value, s.type).frames, 0, "heapInsert");
+      else if (s.op === "extract") P.load(heapExtract(a, s.type).frames, 0, "heapExtract");
+      else if (s.op === "build") P.load(buildHeap(a, s.type).frames, 0, "buildHeap");
+      else if (s.op === "sort") P.load(heapSort(a).frames, 0, "heapSort");
       info();
     }
     const opSeg = segmented([{ value: "view", label: { en: "indexing", bn: "indexing" } }, { value: "insert", label: { en: "insert", bn: "insert" } }, { value: "extract", label: { en: "delete root", bn: "root delete" } }, { value: "build", label: { en: "build heap", bn: "build heap" } }, { value: "sort", label: { en: "heap sort", bn: "heap sort" } }], s.op, (v) => { s.op = v; run(); });

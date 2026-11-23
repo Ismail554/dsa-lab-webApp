@@ -31,7 +31,7 @@ function hub(root) {
 
   const listBox = h("div.qlist");
   const filters = h("div.filters",
-    seg([["all", bn ? "সব" : "All"], ["mid", bn ? "মিডটার্ম" : "Midterm"], ["fin", bn ? "ফাইনাল" : "Final"]], "set"),
+    seg([["all", bn ? "সব" : "All"], ["mid", bn ? "মিডটার্ম" : "Midterm"], ["fin", bn ? "ফাইনাল" : "Final"], ["extra", "Extra"]], "set"),
     seg([["all", bn ? "সব ধরন" : "All types"], ["auto", bn ? "অটো-চেক" : "Auto-checked"], ["theory", bn ? "সংজ্ঞা/ব্যাখ্যা/কোড" : "Definitions/explain/code"]], "type"),
     seg([["all", bn ? "সব" : "Any status"], ["new", bn ? "নতুন" : "Not tried"], ["tried", bn ? "ভুল/অসম্পূর্ণ" : "Needs work"], ["solved", bn ? "সমাধান হয়েছে" : "Solved"]], "st"));
   function seg(opts, key) { const el = h("div.seg"); const draw = () => el.replaceChildren(...opts.map(([v, l]) => h("button", { class: filt[key] === v ? "on" : "", onclick: () => { filt[key] = v; draw(); drawList(); } }, l))); draw(); return el; }

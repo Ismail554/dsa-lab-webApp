@@ -1,7 +1,7 @@
 // Greedy lab: activity selection (timeline), fractional knapsack (ratio bars), Huffman coding (forest → tree).
 import { h, lang } from "../ui.js";
 import { segmented, note, button } from "./kit.js";
-import { vshell, player, svgBox, S, layoutBinary, drawBinary } from "./viz.js";
+import { vshell, player, svgBox, S, layoutBinary, drawBinary, isoRect } from "./viz.js";
 import { activitySelect, fracKnapsack, huffman, ri } from "../dsa.js";
 
 export const ACTS = [["a1", 1, 4], ["a2", 3, 5], ["a3", 0, 6], ["a4", 5, 7], ["a5", 3, 9], ["a6", 5, 9], ["a7", 6, 10], ["a8", 8, 11], ["a9", 8, 12], ["a10", 2, 14], ["a11", 12, 16]].map(([name, s, f]) => ({ name, s, f }));
@@ -23,14 +23,14 @@ export default {
         const maxT = Math.max(...s.acts.map((a) => a.f)) + 1; const X = (t) => 60 + (t * 560) / maxT; const rowH = Math.min(28, 290 / f.order.length);
         for (let t = 0; t <= maxT; t++) svg.append(S("text", { x: X(t), y: 330, class: "ax", "text-anchor": "middle" }, String(t)), S("line", { x1: X(t), y1: 10, x2: X(t), y2: 316, class: "grid" }));
         f.order.forEach((a, r) => { const picked = f.pick.includes(a.i); const cls = picked ? "ok" : f.cur === a.i ? (f.ok ? "ok" : "bad") : f.pick.length && r < f.order.findIndex((x) => x.i === f.cur) && !picked ? "dim" : "";
-          svg.append(S("g", { class: `act ${cls} ${f.cur === a.i ? "cur" : ""}` }, S("text", { x: 52, y: 14 + r * rowH + rowH / 2, "text-anchor": "end", dy: "0.35em" }, a.name), S("rect", { x: X(a.s), y: 14 + r * rowH + 3, width: X(a.f) - X(a.s), height: rowH - 6, rx: 6 }), S("text", { x: (X(a.s) + X(a.f)) / 2, y: 14 + r * rowH + rowH / 2, "text-anchor": "middle", dy: "0.35em", class: "in" }, `${a.s}–${a.f}`))); });
+          svg.append(S("g", { class: `act ${cls} ${f.cur === a.i ? "cur" : ""}` }, S("text", { x: 52, y: 14 + r * rowH + rowH / 2, "text-anchor": "end", dy: "0.35em" }, a.name), isoRect({ x: X(a.s), y: 14 + r * rowH + 6, width: X(a.f) - X(a.s), height: rowH - 9 }, 5), S("text", { x: (X(a.s) + X(a.f)) / 2, y: 14 + r * rowH + rowH / 2, "text-anchor": "middle", dy: "0.35em", class: "in" }, `${a.s}–${a.f}`))); });
       } else if (s.mode === "knapsack") {
         const tot = s.W; const X = (w) => 40 + (w * 560) / tot; let x = 0;
         svg.append(S("rect", { x: 40, y: 250, width: 560, height: 46, rx: 8, class: "sack" }), S("text", { x: 320, y: 318, "text-anchor": "middle", class: "ax" }, `${bn ? "ক্ষমতা" : "capacity"} W = ${tot}`));
         f.order.forEach((it, r) => {
           const t = f.take[it.i]; const y = 20 + r * 64;
-          svg.append(S("g", { class: `item ${f.cur === it.i ? "cur" : ""} ${t ? "ok" : ""}` }, S("rect", { x: 40, y, width: Math.min(560, (it.w * 560) / tot), height: 40, rx: 8 }), S("text", { x: 48, y: y + 20, dy: "0.35em" }, `${it.name}: w=${it.w}, v=${it.v}, v/w=${+it.r.toFixed(2)}${t ? ` → ${t === 1 ? "100%" : +(t * 100).toFixed(1) + "%"}` : ""}`)));
-          if (t) { svg.append(S("rect", { x: X(x), y: 250, width: X(x + t * it.w) - X(x), height: 46, class: `fill f${r % 3}` }), S("text", { x: (X(x) + X(x + t * it.w)) / 2, y: 273, dy: "0.35em", "text-anchor": "middle", class: "in" }, it.name)); x += t * it.w; }
+          svg.append(S("g", { class: `item ${f.cur === it.i ? "cur" : ""} ${t ? "ok" : ""}` }, isoRect({ x: 40, y: y + 4, width: Math.min(560, (it.w * 560) / tot), height: 36 }, 7), S("text", { x: 48, y: y + 20, dy: "0.35em" }, `${it.name}: w=${it.w}, v=${it.v}, v/w=${+it.r.toFixed(2)}${t ? ` → ${t === 1 ? "100%" : +(t * 100).toFixed(1) + "%"}` : ""}`)));
+          if (t) { svg.append(isoRect({ x: X(x), y: 250, width: X(x + t * it.w) - X(x), height: 46, class: `fill f${r % 3}` }, 8), S("text", { x: (X(x) + X(x + t * it.w)) / 2, y: 273, dy: "0.35em", "text-anchor": "middle", class: "in" }, it.name)); x += t * it.w; }
         });
       } else {
         const forest = f.forest; let ox = 0; const total = forest.reduce((a, t) => a + Math.max(1, layoutBinary(t).width), 0);
@@ -43,8 +43,13 @@ export default {
       }
       ui.view.replaceChildren(svg); info(f);
     };
-    const P = player(ui, draw);
-    function run() { P.load(s.mode === "activity" ? activitySelect(s.acts).frames : s.mode === "knapsack" ? fracKnapsack(s.items, s.W).frames : huffman(s.freq).frames); }
+    const P = player(ui, draw, { state: (f) => {
+      const bn = lang() === "bn";
+      if (s.mode === "activity") return [{ label: bn ? "নেওয়া হয়েছে" : "Chosen", items: (f.pick || []).map((i) => s.acts[i].name), tone: "ok" }, { label: bn ? "শেষ finish" : "Last finish", items: [f.pick && f.pick.length ? s.acts[f.pick[f.pick.length - 1]].f : "−∞"] }];
+      if (s.mode === "knapsack") return [{ label: "value", items: [+f.value.toFixed(2)], tone: "ok" }, { label: bn ? "বাকি capacity" : "Capacity left", items: [+f.cap.toFixed(2)], tone: "hot" }];
+      return [{ label: "Queue (freq)", items: f.forest.map((t) => (t.ch !== undefined ? `${t.ch}:${t.f}` : t.f)), tone: "hot" }, f.bits !== undefined ? { label: bn ? "মোট bit" : "Total bits", items: [f.bits], tone: "ok" } : null];
+    } });
+    function run() { P.load(s.mode === "activity" ? activitySelect(s.acts).frames : s.mode === "knapsack" ? fracKnapsack(s.items, s.W).frames : huffman(s.freq).frames, 0, s.mode === "activity" ? "activity" : s.mode === "knapsack" ? "fknap" : "huffman"); }
     const seg = segmented([["activity", "activity selection"], ["knapsack", "fractional knapsack"], ["huffman", "Huffman coding"]].map(([value, label]) => ({ value, label })), s.mode, (v) => { s.mode = v; run(); });
     ui.controls.append(seg, h("div.row", button(bn ? "নতুন এলোমেলো উদাহরণ" : "New random example", () => {
       if (s.mode === "activity") s.acts = Array.from({ length: ri(6, 9) }, (_, i) => { const st = ri(0, 10); return { name: `a${i + 1}`, s: st, f: st + ri(1, 5) }; });

@@ -1,7 +1,7 @@
 // Growth lab: compare growth rates (1, log n, n, n log n, n², 2ⁿ, n!) and count the steps of real loop patterns.
 import { h, L, lang, texHTML } from "../ui.js";
 import { segmented, slider, note, toggle } from "./kit.js";
-import { vshell, svgBox, S } from "./viz.js";
+import { vshell, svgBox, S, isoRect } from "./viz.js";
 
 const CURVES = [
   ["1", (n) => 1, "--c-c"], ["log n", (n) => Math.log2(n), "--c-b"], ["√n", (n) => Math.sqrt(n), "--sky"], ["n", (n) => n, "--c-d"],
@@ -42,7 +42,7 @@ export default {
       } else {
         const lp = LOOPS.find((l) => l.id === s.loop); const ns = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024].filter((x) => x <= Math.max(s.n * 16, 64));
         const maxV = Math.max(...ns.map(lp.count), 1);
-        ns.forEach((n, i) => { const bw = W / ns.length; const hh = (H * lp.count(n)) / maxV; svg.append(S("g", { class: "bar" }, S("rect", { x: X0 + i * bw + 4, y: Y0 - hh, width: bw - 8, height: Math.max(1, hh), rx: 4 }), S("text", { x: X0 + i * bw + bw / 2, y: Y0 - hh - 5, "text-anchor": "middle" }, fmtN(lp.count(n))), S("text", { class: "bar-i", x: X0 + i * bw + bw / 2, y: Y0 + 16, "text-anchor": "middle" }, `n=${n}`))); });
+        ns.forEach((n, i) => { const bw = W / ns.length; const hh = (H * lp.count(n)) / maxV; svg.append(S("g", { class: "bar" }, isoRect({ x: X0 + i * bw + 4, y: Y0 - hh, width: bw - 14, height: Math.max(1, hh) }, 7), S("text", { x: X0 + i * bw + bw / 2, y: Y0 - hh - 5, "text-anchor": "middle" }, fmtN(lp.count(n))), S("text", { class: "bar-i", x: X0 + i * bw + bw / 2, y: Y0 + 16, "text-anchor": "middle" }, `n=${n}`))); });
         ui.msgBar.replaceChildren(h("span", { html: `${bn ? "n দ্বিগুণ হলে count কত গুণ হয়? " : "When n doubles, how does count change? "}${texHTML(`\\Rightarrow \\Theta(${lp.big.replace("sqrt(n)", "\\sqrt n").replace("log n", "\\log n").replace("n^2", "n^2")})`)} — ${L(lp.why)}` }));
       }
       ui.view.replaceChildren(svg); ui.bar.replaceChildren(); info();

@@ -1,7 +1,7 @@
 // B-tree lab: insert keys into a B-tree of order m; watch overflow, median split and the tree growing from the root.
 import { h, lang } from "../ui.js";
 import { segmented, note, button } from "./kit.js";
-import { vshell, player, svgBox, S, parseNums, inputRow } from "./viz.js";
+import { vshell, player, svgBox, S, isoRect, parseNums, inputRow } from "./viz.js";
 import { btreeInsert, btreeBuild, btreeHeight, btreeNodes, ri } from "../dsa.js";
 
 function drawB(svg, root, hl = [], W = 640) {
@@ -15,7 +15,7 @@ function drawB(svg, root, hl = [], W = 640) {
     let cx = x0; const kidTops = [];
     n.kids.forEach((k) => { const kw = width(k); kidTops.push(place(k, cx, depth + 1)); cx += kw + GAP; });
     kidTops.forEach(([tx, ty], i) => g.append(S("line", { x1: x + PAD / 2 + i * CW, y1: y + 30, x2: tx, y2: ty, class: "t-edge" })));
-    const box = S("g", { class: "b-node", transform: `translate(${x},${y})` }, S("rect", { width: nw, height: 30, rx: 8 }));
+    const box = S("g", { class: "b-node", transform: `translate(${x},${y})` }, isoRect({ width: nw, height: 30 }, 7));
     n.keys.forEach((k, i) => { box.append(S("text", { x: PAD / 2 + i * CW + CW / 2, y: 15, dy: "0.35em", "text-anchor": "middle", class: hl.includes(k) ? "b-hl" : "" }, String(k))); if (i) box.append(S("line", { x1: PAD / 2 + i * CW, y1: 4, x2: PAD / 2 + i * CW, y2: 26, class: "b-sep" })); });
     g.append(box);
     return [x + nw / 2, y];
@@ -34,11 +34,19 @@ export default {
     const ui = vshell(host, preset);
     let tree = null;
     const draw = (f) => { const svg = svgBox(640, 330); drawB(svg, f.t, f.hl || []); ui.view.replaceChildren(svg); info(f.t); };
-    const P = player(ui, draw);
+    const P = player(ui, draw, { state: (f) => {
+      const bn = lang() === "bn";
+      return [
+        { label: bn ? "Insert ক্রম" : "Insert order", items: s.keys },
+        f.hl && f.hl.length ? { label: bn ? "এখন" : "Now", items: f.hl, tone: "hot" } : null,
+        { label: bn ? "সর্বোচ্চ key/node" : "max keys / node", items: [s.m - 1] },
+        { label: "height", items: [f.t ? btreeHeight(f.t) : "—"] },
+      ];
+    } });
     function rebuild() {
       const prev = btreeBuild(s.keys.slice(0, -1), s.m).tree; const last = s.keys[s.keys.length - 1];
       if (last === undefined) { tree = null; P.load([{ t: null, msg: { en: "Empty B-tree.", bn: "খালি B-tree।" } }]); return; }
-      const r = btreeInsert(prev, last, s.m); tree = r.result; P.load(r.frames);
+      const r = btreeInsert(prev, last, s.m); tree = r.result; P.load(r.frames, 0, "btree");
     }
     const keysIn = inputRow(bn ? "key ক্রম" : "key sequence", s.keys.join(", "), bn ? "বানাও" : "Build", (v) => { s.keys = parseNums(v, 24); rebuild(); });
     const addIn = inputRow(bn ? "নতুন key" : "next key", 60, "Insert", (v, inp) => { const x = parseNums(v)[0]; if (x === undefined || s.keys.includes(x)) return; s.keys.push(x); keysIn.input.value = s.keys.join(", "); inp.value = ri(1, 99); rebuild(); });

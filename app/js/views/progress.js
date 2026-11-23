@@ -54,7 +54,7 @@ const stat = (v, l) => h("div.card.stat-card", v, h("small", l));
 function knowledgeMap(lib) {
   const W = 1000, H = 520, X = (c) => 90 + c * 164, Y = (r) => 70 + (r + 1.2) * 100;
   const nodes = TOPICS.map((t) => ({ id: t.id, x: X(t.pos[0]), y: Y(t.pos[1]), title: L(t.title), m: store.masteryOf(t.id), href: `#/learn/${t.id}`, set: t.set }));
-  lib.forEach((l, k) => nodes.push({ id: l.id, x: X(k % 6) , y: Y(4.1) + Math.floor(k / 6) * 70, title: l.title, m: -1, href: `#/library/${l.doc}`, links: l.links, lib: true }));
+  lib.forEach((l, k) => nodes.push({ id: l.id, x: X(k % 6) , y: Y(5.0) + Math.floor(k / 6) * 70, title: l.title, m: -1, href: `#/library/${l.doc}`, links: l.links, lib: true }));
   const Hh = Math.max(H, Math.max(...nodes.map((n) => n.y)) + 60);
   const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
   const edges = [];
@@ -63,7 +63,7 @@ function knowledgeMap(lib) {
   const col = (m) => (m < 0 ? "var(--violet)" : m === 0 ? "var(--card-2)" : m < 0.45 ? "var(--rust-soft)" : m < 0.75 ? "var(--gold-soft)" : "var(--green)");
   const svg = `<svg viewBox="0 0 ${W} ${Hh}" class="kmap" role="img" aria-label="Knowledge map">
     <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
-    <text x="20" y="${Y(-1.25)}" class="kmap-set">Midterm</text><text x="20" y="${Y(2.0)}" class="kmap-set">Final</text>${lib.length ? `<text x="20" y="${Y(3.6)}" class="kmap-set">Library</text>` : ""}
+    <text x="20" y="${Y(-1.25)}" class="kmap-set">Midterm</text><text x="20" y="${Y(2.0)}" class="kmap-set">Final</text><text x="20" y="${Y(3.1)}" class="kmap-set">Extra</text>${lib.length ? `<text x="20" y="${Y(4.45)}" class="kmap-set">Library</text>` : ""}
     ${edges.map(([a, b, d]) => { if (!a || !b) return ""; const mx = (a.x + b.x) / 2; return `<path d="M${a.x + 62} ${a.y} C ${mx + 30} ${a.y}, ${mx - 30} ${b.y}, ${b.x - 66} ${b.y}" fill="none" stroke="var(--muted)" stroke-width="1.4" ${d ? 'stroke-dasharray="4 4"' : ""} marker-end="url(#arr)" opacity=".7"/>`; }).join("")}
     ${nodes.map((n) => `<a href="${n.href}" class="kmap-node"><g transform="translate(${n.x},${n.y})"><rect x="-68" y="-24" width="136" height="48" rx="12" fill="var(--ink)" transform="translate(2,3)"/><rect x="-68" y="-24" width="136" height="48" rx="12" fill="${col(n.m)}" stroke="var(--ink)" stroke-width="1.6"/>
       ${wrap(n.title).map((ln, k, arr) => `<text text-anchor="middle" y="${(k - (arr.length - 1) / 2) * 13 + 4}" class="kmap-t">${esc(ln)}</text>`).join("")}

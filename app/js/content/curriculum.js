@@ -1,6 +1,7 @@
 // CSE 2205 Data Structures & Algorithms II — curriculum from the course outline (weeks 1–12) and the class notes.
 // Each topic = knowledge-map node with a step-by-step visual lesson (EN + Bangla), formulas and a Feynman prompt.
 import { STORIES } from "./stories.js";
+import { EXTRA_SET, EXTRA_TOPICS, EXTRA_STORIES } from "./extra.js";
 
 export const SETS = [
   { id: "mid", code: "Midterm", title: { en: "Analysis, Trees, Heaps & Graphs (Weeks 1–6)", bn: "Analysis, Tree, Heap ও Graph (সপ্তাহ ১–৬)" }, sources: ["Space_Complexity CLASS NOTES.md", "Sum_of_Digits_Recursion_Complete_Solution.md", "recursive_time_complexity_bounds.md", "extended_master_theorem_guide.md", "Binary_Tree_and_Heap_Complete_Notes.md"] },
@@ -544,9 +545,13 @@ export const TOPICS = [
   },
 ];
 
+// Extra lessons beyond the syllabus
+SETS.push(EXTRA_SET);
+TOPICS.push(...EXTRA_TOPICS);
+
 // Story-first ("গল্পের মতো করে, কোড ছাড়া"): every lesson opens with an everyday story before any formula or code.
 for (const t of TOPICS) {
-  const st = STORIES[t.id];
+  const st = STORIES[t.id] || EXTRA_STORIES[t.id];
   if (st) t.steps.unshift({ tag: "story", story: true, title: st.title, body: st.body, key: { en: "Hold on to the picture — the next steps give it a name and a formula.", bn: "ছবিটা মনে রাখো — পরের ধাপগুলো এর নাম আর সূত্র দেবে।" }, lab: t.steps[0].lab, ask: st.ask });
 }
 

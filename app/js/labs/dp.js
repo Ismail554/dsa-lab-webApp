@@ -1,5 +1,5 @@
 // Dynamic-programming lab: Fibonacci (recursion vs memo vs table), 0/1 knapsack, LCS, matrix-chain multiplication.
-import { h, lang, texHTML } from "../ui.js";
+import { h, L, lang, texHTML } from "../ui.js";
 import { segmented, note, button, slider } from "./kit.js";
 import { vshell, player, svgBox, S, layoutBinary, drawBinary, dpTable, inputRow, parseNums } from "./viz.js";
 import { knapsack01, lcs, matrixChain, fibCalls, fibTab, ri, pick } from "../dsa.js";
@@ -46,12 +46,18 @@ export default {
       info(f);
     };
     const pathOfKnap = (T) => { const out = []; let w = s.W; for (let i = s.items.length; i > 0; i--) { out.push([i, w]); if (T[i][w] !== T[i - 1][w]) w -= s.items[i - 1].w; } return out; };
-    const P = player(ui, draw);
+    const P = player(ui, draw, { state: (f) => {
+      const bn = lang() === "bn";
+      if (s.mode === "fib") return [{ label: bn ? "মোট call" : "Calls", items: [f.calls], tone: "hot" }, { label: "memo", items: s.memo ? fibTab(s.n) : [bn ? "নেই" : "off"] }];
+      if (!f.cell) return [f.done ? { label: bn ? "উত্তর" : "Answer", items: [L(f.msg).replace(/^.*?=\s*/, "").slice(0, 40)], tone: "ok" } : null];
+      const [i, j] = f.cell; const v = f.T[i][j];
+      return [{ label: bn ? "এখনকার ঘর" : "Current cell", items: [`[${i}][${j}] = ${v}`], tone: "hot" }, { label: bn ? "যেখান থেকে" : "Built from", items: (f.from || []).map(([a, b]) => `[${a}][${b}] = ${f.T[a][b]}`) }];
+    } });
     function run() {
-      if (s.mode === "fib") P.load(fibFrames(s.n, s.memo), "end");
-      else if (s.mode === "knapsack") P.load(knapsack01(s.items, s.W).frames);
-      else if (s.mode === "lcs") P.load(lcs(s.X, s.Y).frames);
-      else P.load(matrixChain(s.dims).frames);
+      if (s.mode === "fib") P.load(fibFrames(s.n, s.memo), "end", s.memo ? "fibMemo" : "fib");
+      else if (s.mode === "knapsack") P.load(knapsack01(s.items, s.W).frames, 0, "knap01");
+      else if (s.mode === "lcs") P.load(lcs(s.X, s.Y).frames, 0, "lcs");
+      else P.load(matrixChain(s.dims).frames, 0, "mcm");
       controls();
     }
     const seg = segmented([["fib", "Fibonacci"], ["knapsack", "0/1 knapsack"], ["lcs", "LCS"], ["mcm", "matrix chain"]].map(([value, label]) => ({ value, label })), s.mode, (v) => { s.mode = v; run(); });

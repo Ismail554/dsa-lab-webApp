@@ -1,0 +1,78 @@
+/* ===================== 3D isometric look + pseudocode + state box ===================== */
+
+/* isometric grid behind every visualization */
+.viz-view {
+  background-color: var(--canvas);
+  background-image:
+    repeating-linear-gradient(30deg, transparent 0 27px, var(--grid-2) 27px 28px),
+    repeating-linear-gradient(150deg, transparent 0 27px, var(--grid-2) 27px 28px);
+}
+
+/* 3D blocks: every face takes the block colour --f; top lighter, side darker */
+.iso-front, .iso-top, .iso-side { fill: var(--f, var(--card)); stroke: var(--ink); stroke-width: 1.3; stroke-linejoin: round; transition: fill .25s; }
+.iso-top { filter: brightness(1.12); }
+.iso-side { filter: brightness(.8); }
+.hatch-bg { fill: var(--rust-soft); }
+.hatch-ln { stroke: var(--rust); stroke-width: 2.4; }
+:is(.hl, .sw, .cur, .piv, .bad, .hot) > .iso > .iso-side,
+:is(.hl, .sw, .cur, .piv, .bad, .hot).iso > .iso-side { fill: url(#hatch); filter: none; }
+
+/* block colours */
+.t-node, .g-node, .b-node { --f: var(--card); }
+.t-node.hl { --f: var(--gold-soft); } .t-node.sw { --f: var(--rust-soft); } .t-node.ok { --f: var(--green); }
+.t-node.bad { --f: var(--rust); } .t-node.sel { --f: var(--violet); } .t-node.rel { --f: var(--fill-b); }
+.t-node.leaf { --f: var(--fill-c); } .t-node.hit { --f: var(--sky); } .t-node.done { --f: var(--line); }
+.t-node.done text { fill: var(--muted); }
+.t-node.ghost { --f: transparent; } .t-node.ghost :is(.iso-front, .iso-top, .iso-side) { stroke: var(--line-strong); stroke-dasharray: 3 2; filter: none; }
+.g-node.vis { --f: var(--green); } .g-node.fin { --f: var(--fill-b); } .g-node.cur { --f: var(--gold); }
+.g-node .g-sub { transform: translateY(-4px); }
+.bar { --f: var(--fill-b); } .bar.hl { --f: var(--gold-soft); } .bar.piv { --f: var(--rust); } .bar.ok { --f: var(--green); } .bar.merged { --f: var(--violet); }
+.act { --f: var(--card-2); } .act.ok { --f: var(--green); } .act.bad { --f: var(--rust-soft); }
+.item { --f: var(--card-2); } .item.ok { --f: var(--green); }
+.fill.f0 { --f: var(--fill-a); } .fill.f1 { --f: var(--fill-b); } .fill.f2 { --f: var(--fill-c); }
+.rt-node { --f: var(--fill-b); } .rt-node .iso-front, .rt-node .iso-top, .rt-node .iso-side { stroke-width: .8; }
+.rt-bar { --f: var(--violet); } .rt-bar.max { --f: var(--rust-soft); }
+.frame { --f: var(--fill-b); } .frame.top { --f: var(--gold-soft); }
+.cell3 { --f: var(--card); }
+
+/* array strip as 3D boxes (CSS oblique faces) */
+.arr { gap: 12px 12px; padding: 14px 14px 6px 4px; }
+.arr-cell { position: relative; border-radius: 0; box-shadow: none; --f: var(--card); background: var(--f); }
+.arr-cell::before, .arr-cell::after { content: ""; position: absolute; background: var(--f); border: 1.5px solid var(--ink); box-sizing: border-box; }
+.arr-cell::before { left: -1.5px; top: -9px; width: calc(100% + 3px); height: 9px; transform: skewX(-45deg); transform-origin: bottom left; filter: brightness(1.12); border-bottom: 0; }
+.arr-cell::after { right: -10px; top: -1.5px; width: 9px; height: calc(100% + 3px); transform: skewY(-45deg); transform-origin: top left; filter: brightness(.8); border-left: 0; }
+.arr-cell.hl { --f: var(--gold-soft); background: var(--f); }
+.arr-cell.hl::after, .arr-cell.sw::after { background: repeating-linear-gradient(45deg, var(--rust-soft) 0 3px, var(--rust) 3px 5px); filter: none; }
+.arr-cell.sw { --f: var(--rust-soft); background: var(--f); }
+.arr-cell.ok { --f: var(--green); background: var(--f); }
+.arr-cell.sel { --f: var(--violet); background: var(--f); }
+.arr-cell.dim { opacity: .45; }
+
+/* pseudocode panel */
+.code-box, .state-box { border: 1px solid var(--line); border-radius: 12px; background: var(--paper-2); overflow: hidden; }
+.code-box[hidden], .state-box[hidden] { display: none; }
+.box-head { display: flex; align-items: center; gap: 6px; padding: 7px 10px; font: 700 11.5px var(--font); color: var(--ink-2); border-bottom: 1px solid var(--line); background: var(--card); }
+.box-ico { color: var(--rust); font-size: 13px; }
+.code-lines { list-style: none; margin: 0; padding: 4px 0; counter-reset: ln; max-height: 230px; overflow: auto; }
+.code-lines li { counter-increment: ln; display: flex; gap: 8px; padding: 1px 10px 1px 0; font: 500 11.5px/1.55 var(--font); color: var(--muted); border-left: 3px solid transparent; }
+.code-lines li::before { content: counter(ln); width: 22px; text-align: right; color: var(--muted-2); flex: none; font-size: 10.5px; }
+.code-lines li code { white-space: pre; background: none; padding: 0; color: inherit; font: inherit; }
+.code-lines li.on { background: var(--rust-soft); color: var(--ink); border-left-color: var(--rust); font-weight: 700; }
+
+/* state box */
+.state-box { padding: 6px 8px; display: grid; gap: 6px; }
+.state-row { display: grid; grid-template-columns: minmax(84px, auto) 1fr; align-items: center; gap: 6px; font-size: 11.5px; padding: 3px 4px; border-radius: 8px; }
+.state-l { font-weight: 700; color: var(--ink-2); }
+.state-n { grid-column: 1 / -1; color: var(--muted); }
+.state-items { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.chipbox { font: 700 11px var(--font); padding: 2px 6px; border: 1.3px solid var(--ink); background: var(--card); box-shadow: 2px 2px 0 var(--ink); border-radius: 4px; }
+.state-row.hot { background: var(--rust-soft); } .state-row.hot .chipbox { background: var(--gold-soft); }
+.state-row.ok .chipbox { background: var(--green); }
+.state-row.bad .chipbox { background: var(--rust); color: #fff; }
+.lab-panel > .code-box, .lab-panel > .state-box, .lab-panel > .lab-controls { flex: none; }
+/* linear lab */
+.cell3.hl { --f: var(--gold-soft); } .cell3.bad { --f: var(--rust); } .cell3.ok { --f: var(--green); } .cell3.slot { --f: var(--violet); }
+.cell3.empty { --f: transparent; } .cell3.empty :is(.iso-front, .iso-top, .iso-side) { stroke: var(--line-strong); stroke-dasharray: 3 2; filter: none; }
+.cell3-t { font-size: 13px; font-weight: 800; fill: var(--ink); }
+.ll-arrow { stroke: var(--ink-2); stroke-width: 1.8; } .ll-arrow.back { stroke: var(--c-c); }
+.t-edge.on { stroke: var(--rust); stroke-width: 3; }

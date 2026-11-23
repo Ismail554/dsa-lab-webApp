@@ -2,7 +2,7 @@
 // (2) call stack of a recursive function (space = maximum stack depth).
 import { h, L, lang, texHTML } from "../ui.js";
 import { segmented, slider, note, button } from "./kit.js";
-import { vshell, player, svgBox, S } from "./viz.js";
+import { vshell, player, svgBox, S, isoRect, cube, renderCode, renderState } from "./viz.js";
 import { master } from "../dsa.js";
 
 const FUNCS = {
@@ -38,16 +38,16 @@ export default {
       const maxW = Math.max(...work);
       for (let i = 0; i <= levels; i++) {
         const y = 22 + i * (300 / (levels + 1)); const shown = Math.min(Math.pow(a, i), 32); const x0 = 30, x1 = 370; const step = (x1 - x0) / shown;
-        for (let j = 0; j < shown; j++) svg.append(S("circle", { cx: x0 + step * (j + 0.5), cy: y, r: Math.max(2.5, Math.min(11, step / 2.6)), class: "rt-node" }));
+        for (let j = 0; j < shown; j++) svg.append(S("g", { class: "rt-node", transform: `translate(${x0 + step * (j + 0.5)},${y})` }, cube(Math.max(2.5, Math.min(10, step / 2.8)))));
         if (Math.pow(a, i) > 32) svg.append(S("text", { x: x1 + 4, y: y + 4, class: "ax" }, "…"));
         svg.append(S("text", { x: 4, y: y + 4, class: "ax" }, `L${i}`));
-        const bw = (240 * work[i]) / maxW; svg.append(S("rect", { x: 390, y: y - 9, width: Math.max(2, bw), height: 18, rx: 4, class: `rt-bar ${work[i] === maxW ? "max" : ""}` }), S("text", { x: 394 + Math.max(2, bw), y: y + 4, class: "ax" }, `${+(work[i] / work[0]).toPrecision(3)}×`));
+        const bw = (240 * work[i]) / maxW; svg.append(isoRect({ x: 390, y: y - 7, width: Math.max(2, bw), height: 16, class: `rt-bar ${work[i] === maxW ? "max" : ""}` }, 5), S("text", { x: 394 + Math.max(2, bw), y: y + 4, class: "ax" }, `${+(work[i] / work[0]).toPrecision(3)}×`));
       }
       svg.append(S("text", { x: 30, y: 336, class: "ax" }, bn ? `প্রতি level এ node: a^i = ${a}^i, আকার n/${b}^i` : `nodes per level a^i = ${a}^i, size n/${b}^i`), S("text", { x: 390, y: 336, class: "ax" }, bn ? "level এর মোট কাজ (root এর তুলনায়)" : "work per level (× root)"));
       ui.view.replaceChildren(svg);
       const r = master(a, b, k, p);
       ui.msgBar.replaceChildren(h("span", { html: `${texHTML(`T(n)=${a}T(n/${b})+${k ? (k === 1 ? "n" : `n^{${k}}`) : ""}${p ? (p === 1 ? "\\log n" : `\\log^{${p}} n`) : k ? "" : "1"}`)} &nbsp;⇒&nbsp; <b>Case ${r.kase}</b>: ${texHTML(r.tex)} — ${L(r.why)}` }));
-      ui.bar.replaceChildren();
+      ui.bar.replaceChildren(); renderCode(ui.code, null); renderState(ui.state, []);
       ui.info.replaceChildren(
         h("div.kv", h("div", h("b", "a "), String(a)), h("div", h("b", "b^k "), String(+r.bk.toFixed(3))), h("div", h("b", "log_b a "), String(+r.L.toFixed(3)))),
         h("table.dp.small", h("tr", h("th", "case"), h("th", bn ? "শর্ত" : "condition"), h("th", "T(n)")),
@@ -58,11 +58,11 @@ export default {
       const fn = FUNCS[s.fn]; const { F, depth } = stackFrames(fn, fn.arg);
       if (!P) P = player(ui, (f) => {
         const svg = svgBox(640, 340); const st = f.stack; const hh = Math.min(34, 300 / Math.max(1, st.length + 1));
-        st.forEach((x, i) => svg.append(S("g", { class: `frame ${i === st.length - 1 ? "top" : ""}` }, S("rect", { x: 180, y: 320 - (i + 1) * hh, width: 280, height: hh - 4, rx: 6 }), S("text", { x: 320, y: 320 - (i + 1) * hh + hh / 2 - 2, "text-anchor": "middle", dy: "0.35em" }, `${FUNCS[s.fn].name.replace(/\(.*/, "")}(${x})${i === st.length - 1 && f.phase === "ret" ? ` → ${f.ret}` : ""}`))));
+        st.forEach((x, i) => svg.append(S("g", { class: `frame ${i === st.length - 1 ? "top" : ""}` }, isoRect({ x: 180, y: 320 - (i + 1) * hh + 4, width: 280, height: hh - 6 }, 6), S("text", { x: 320, y: 320 - (i + 1) * hh + hh / 2 - 2, "text-anchor": "middle", dy: "0.35em" }, `${FUNCS[s.fn].name.replace(/\(.*/, "")}(${x})${i === st.length - 1 && f.phase === "ret" ? ` → ${f.ret}` : ""}`))));
         svg.append(S("line", { x1: 160, y1: 320, x2: 480, y2: 320, class: "t-edge" }), S("text", { x: 320, y: 336, "text-anchor": "middle", class: "ax" }, bn ? "call stack (নিচে main)" : "call stack (main at the bottom)"));
         ui.view.replaceChildren(svg);
       });
-      P.load(F);
+      P.load(F, 0, "rec-" + s.fn); P.setState((f) => [{ label: lang() === "bn" ? "Stack (নিচে প্রথম call)" : "Stack (first call at bottom)", items: f.stack, tone: "hot" }, f.ret !== undefined ? { label: lang() === "bn" ? "ফেরত মান" : "Returned", items: [f.ret], tone: "ok" } : null]);
       ui.info.replaceChildren(h("pre.code", fn.code), h("div.mathblock", { html: texHTML(fn.tex, true) }), h("div.kv", h("div", h("b", bn ? "সর্বোচ্চ depth " : "max depth "), String(depth))),
         note(bn ? "প্রতিটা recursive call stack এ একটা frame রাখে (parameter, local variable, return address)। তাই recursion এর space = সর্বোচ্চ depth × প্রতি frame এর জায়গা।" : "Every recursive call keeps a frame on the stack (parameters, locals, return address). So recursion space = maximum depth × frame size."));
     }

@@ -152,5 +152,39 @@ export const GENERATORS = [
   } },
 ];
 
+// ---------- extra lessons ----------
+GENERATORS.push(
+  { id: "g-stack", topic: "stackqueue", name: "Stack trace", make() {
+    const ops = []; let n = 0; for (let k = 0; k < ri(6, 9); k++) { if (n && Math.random() < 0.4) { ops.push("pop"); n--; } else { ops.push(`push ${ri(1, 99)}`); n++; } }
+    if (!ops.includes("pop")) ops.push("pop");
+    const r = D.stackOps(ops);
+    return { q: `Run on an empty stack: ${ops.join(", ")}. Which values are popped, in order?`, fields: [fld("popped", r.popped.join(", "), "seq")], solution: ["Each pop removes the current top (LIFO).", `Popped: ${r.popped.join(", ")}; left on the stack (bottom → top): ${r.stack.join(", ") || "nothing"}.`] };
+  } },
+  { id: "g-cqueue", topic: "stackqueue", name: "Circular queue index", make() {
+    const cap = ri(4, 9), front = ri(0, cap - 1), size = ri(1, cap - 1);
+    return { q: `Circular queue: capacity ${cap}, front = ${front}, size = ${size}. At which index does the next enqueue go?`, fields: [fld("rear", (front + size) % cap, "num")], solution: [`rear = (front + size) mod cap = (${front} + ${size}) mod ${cap} = ${(front + size) % cap}.`] };
+  } },
+  { id: "g-llrev", topic: "linkedlist", name: "Linked-list operation", make() {
+    const list = distinct(ri(4, 6), 1, 60); const op = pick(["reverse", "delete", "head"]); const x = op === "delete" ? pick(list) : ri(61, 99);
+    const r = D.listOp(list, op, x);
+    return { q: `List ${list.join(" → ")} → null. ${op === "reverse" ? "Reverse it." : op === "delete" ? `Delete ${x}.` : `Insert ${x} at the head.`} What is the list now?`, fields: [fld("list", r.list.join(" "), "seq")], solution: [op === "reverse" ? "prev/cur/next: point each node back to the previous one." : op === "delete" ? "prev.next = cur.next skips the node." : "node.next = head; head = node.", `${r.list.join(" → ")} → null.`] };
+  } },
+  { id: "g-hash", topic: "hashing", name: "Hash slot (linear probing)", make() {
+    const m = pick([7, 11, 13]); const keys = distinct(ri(4, 6), 1, 120); const r = D.hashInsert(keys, m, "probe"); const k = keys[keys.length - 1];
+    return { q: `Linear probing, h(k) = k mod ${m}. Insert ${keys.join(", ")} in order. In which slot does ${k} end up?`, fields: [fld("slot", r.table.indexOf(k), "num")], solution: [`h(${k}) = ${k % m}; walk forward past taken slots.`, `Final table: [${r.table.map((x) => (x === null ? "—" : x)).join(", ")}].`] };
+  } },
+  { id: "g-trie", topic: "trie", name: "Trie size", make() {
+    const pool = ["car", "cat", "cart", "care", "dog", "do", "dot", "tea", "ten", "to", "an", "ant", "and", "bat", "bad"];
+    const words = shuffle(pool).slice(0, ri(3, 5)); const r = D.trieBuild(words);
+    return { q: `How many nodes (including the root) does a trie need for: ${words.join(", ")}?`, fields: [fld("nodes", r.nodes, "num")], solution: ["Shared prefixes are stored once.", `${r.nodes} nodes.`] };
+  } },
+  { id: "g-topo", topic: "topo", name: "Topological order", make() {
+    const n = ri(5, 6); const perm = shuffle([...Array(n).keys()]); const edges = [];
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (Math.random() < 0.35) edges.push({ u: perm[i], v: perm[j] });
+    const G = { n, directed: true, edges }; const r = D.topo(G);
+    return { q: `DAG with edges ${edges.map((e) => `${L(e.u)}→${L(e.v)}`).join(", ") || "(none)"} on vertices ${[...Array(n).keys()].map(L).join(", ")}. Topological order, always taking the smallest ready vertex?`, fields: [fld("order", r.order.map(L).join(" "), "seq")], solution: ["Kahn: output an in-degree-0 vertex (smallest first), delete its edges, repeat.", `Order: ${r.order.map(L).join(" → ")}.`] };
+  } },
+);
+
 export const genById = (id) => GENERATORS.find((g) => g.id === id);
 export const gensForTopic = (topic) => GENERATORS.filter((g) => g.topic === topic);

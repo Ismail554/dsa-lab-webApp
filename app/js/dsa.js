@@ -434,6 +434,23 @@ export function kruskal(G) {
   F.push({ tree, vis: Array.from({ length: G.n }, (_, i) => i), done: true, msg: msg(`MST weight = ${total}.`, `MST এর ওজন = ${total}।`) });
   return { frames: F, tree, total };
 }
+export function topo(G) { // Kahn's algorithm with frames, smallest label first
+  const indeg = Array(G.n).fill(0); G.edges.forEach((e) => indeg[e.v]++); const out = []; const F = []; const used = [];
+  let ready = indeg.flatMap((d, k) => (d ? [] : [k]));
+  F.push({ indeg: [...indeg], ready: [...ready], order: [], vis: [], tree: [], msg: msg(`Count in-degrees: ${indeg.map((d, k) => `${L(G, k)}=${d}`).join(", ")}. Vertices with in-degree 0 are ready.`, `In-degree গোনো: ${indeg.map((d, k) => `${L(G, k)}=${d}`).join(", ")}। যাদের in-degree 0, তারা ready।`) });
+  while (ready.length) {
+    ready.sort((a, b) => a - b); const u = ready.shift(); out.push(u);
+    F.push({ indeg: [...indeg], ready: [...ready], order: [...out], vis: [...out], cur: u, tree: [...used], msg: msg(`Output ${L(G, u)} (smallest ready vertex).`, `${L(G, u)} output করো (ready এর মধ্যে সবচেয়ে ছোট)।`) });
+    G.edges.forEach((e, idx) => {
+      if (e.u !== u) return;
+      indeg[e.v]--; used.push(idx); const nowReady = indeg[e.v] === 0; if (nowReady) ready.push(e.v);
+      F.push({ indeg: [...indeg], ready: [...ready], order: [...out], vis: [...out], cur: u, edge: idx, tree: [...used], msg: msg(`Remove edge ${L(G, u)}→${L(G, e.v)}: in-degree of ${L(G, e.v)} becomes ${indeg[e.v]}${nowReady ? " → ready" : ""}.`, `${L(G, u)}→${L(G, e.v)} edge সরাও: ${L(G, e.v)} এর in-degree এখন ${indeg[e.v]}${nowReady ? " → ready" : ""}।`) });
+    });
+  }
+  const ok = out.length === G.n;
+  F.push({ indeg: [...indeg], ready: [], order: out, vis: out, tree: used, done: true, msg: ok ? msg(`Topological order: ${out.map((x) => L(G, x)).join(" → ")}`, `Topological ক্রম: ${out.map((x) => L(G, x)).join(" → ")}`) : msg("Some vertices never became ready → the graph has a cycle.", "কিছু vertex কখনো ready হয়নি → graph এ cycle আছে।") });
+  return { frames: F, order: ok ? out : null };
+}
 export function topoSort(G) { // Kahn, smallest label first
   const indeg = Array(G.n).fill(0); G.edges.forEach((e) => indeg[e.v]++); const A = adj(G); const out = []; const ready = indeg.flatMap((d, k) => (d ? [] : [k]));
   while (ready.length) { ready.sort((a, b) => a - b); const u = ready.shift(); out.push(u); for (const { v } of A[u]) if (--indeg[v] === 0) ready.push(v); }
@@ -595,3 +612,116 @@ export function shuffle(a) { const b = [...a]; for (let i = b.length - 1; i > 0;
 export const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 export const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 export function distinct(n, lo = 1, hi = 99) { const s = new Set(); while (s.size < n) s.add(ri(lo, hi)); return [...s]; }
+
+// =====================================================================
+// Linear structures, hashing and tries (step-traced)
+// =====================================================================
+/** ops: ["push 5", "pop", "peek"] */
+export function stackOps(ops) {
+  const st = []; const F = [{ st: [], msg: msg("Empty stack. Top is where everything happens.", "খালি stack। সব কাজ top এ হয়।") }]; const out = [];
+  for (const op of ops) {
+    const [cmd, v] = op.trim().split(/\s+/);
+    if (cmd === "push") { st.push(+v); F.push({ st: [...st], hl: [st.length - 1], msg: msg(`push ${v}: put it on top.`, `push ${v}: top এ রাখো।`) }); }
+    else if (cmd === "pop") {
+      if (!st.length) { F.push({ st: [], bad: true, msg: msg("pop on an empty stack → underflow!", "খালি stack এ pop → underflow!") }); continue; }
+      const x = st.pop(); out.push(x); F.push({ st: [...st], out: [...out], gone: x, msg: msg(`pop → ${x} leaves from the top (LIFO).`, `pop → ${x} top থেকে বের হলো (LIFO)।`) });
+    } else if (cmd === "peek") F.push({ st: [...st], hl: st.length ? [st.length - 1] : [], msg: msg(st.length ? `peek → ${st[st.length - 1]} (look only, do not remove).` : "peek on an empty stack.", st.length ? `peek → ${st[st.length - 1]} (শুধু দেখো, সরাও না)।` : "খালি stack এ peek।") });
+  }
+  F.push({ st: [...st], out, done: true, msg: msg(`Popped in order: ${out.join(", ") || "none"}. Every operation is O(1).`, `Pop এর ক্রম: ${out.join(", ") || "কিছু না"}। প্রতিটা operation O(1)।`) });
+  return { frames: F, stack: st, popped: out };
+}
+/** Circular queue of capacity cap. ops: ["enqueue 5", "dequeue"] */
+export function queueOps(ops, cap = 6) {
+  const q = Array(cap).fill(null); let front = 0, size = 0; const out = [];
+  const rear = () => (front + size - 1 + cap) % cap;
+  const F = [{ q: [...q], front, rear: -1, size, msg: msg(`Empty circular queue of capacity ${cap}. front = 0.`, `${cap} ঘরের খালি circular queue। front = 0।`) }];
+  for (const op of ops) {
+    const [cmd, v] = op.trim().split(/\s+/);
+    if (cmd === "enqueue") {
+      if (size === cap) { F.push({ q: [...q], front, rear: rear(), size, bad: true, msg: msg("Queue is full → overflow!", "Queue ভরা → overflow!") }); continue; }
+      const r = (front + size) % cap; q[r] = +v; size++;
+      F.push({ q: [...q], front, rear: r, size, hl: [r], msg: msg(`enqueue ${v} at rear = (front + size) mod ${cap} = ${r}.`, `enqueue ${v}: rear = (front + size) mod ${cap} = ${r}।`) });
+    } else if (cmd === "dequeue") {
+      if (!size) { F.push({ q: [...q], front, rear: -1, size, bad: true, msg: msg("dequeue on an empty queue → underflow!", "খালি queue তে dequeue → underflow!") }); continue; }
+      const x = q[front]; q[front] = null; out.push(x); front = (front + 1) % cap; size--;
+      F.push({ q: [...q], front, rear: size ? rear() : -1, size, out: [...out], msg: msg(`dequeue → ${x} leaves from the front (FIFO). front moves to ${front}.`, `dequeue → ${x} সামনে থেকে বের হলো (FIFO)। front এখন ${front}।`) });
+    }
+  }
+  F.push({ q: [...q], front, rear: size ? rear() : -1, size, out, done: true, msg: msg(`Dequeued in order: ${out.join(", ") || "none"}. All O(1) — the array wraps around.`, `Dequeue এর ক্রম: ${out.join(", ") || "কিছু না"}। সব O(1) — array ঘুরে আবার শুরুতে আসে।`) });
+  return { frames: F, queue: q, front, size, dequeued: out };
+}
+/** Singly linked list: op = head | tail | insert | delete | reverse */
+export function listOp(vals, op, x, pos = 0) {
+  const a = [...vals]; const F = [];
+  if (op === "head") {
+    F.push({ list: [...a], newNode: x, msg: msg(`Create node ${x}.`, `${x} এর node বানাও।`) });
+    a.unshift(x); F.push({ list: [...a], hl: [0], msg: msg("newNode.next = head; head = newNode. O(1).", "newNode.next = head; head = newNode। O(1)।") });
+  } else if (op === "tail") {
+    for (let i = 0; i < a.length; i++) F.push({ list: [...a], cur: i, msg: msg(`Walk: cur = ${a[i]}${i === a.length - 1 ? " (last node)" : ""}.`, `হাঁটো: cur = ${a[i]}${i === a.length - 1 ? " (শেষ node)" : ""}।`) });
+    a.push(x); F.push({ list: [...a], hl: [a.length - 1], msg: msg(`last.next = newNode(${x}). O(n) without a tail pointer.`, `last.next = newNode(${x})। tail pointer না থাকলে O(n)।`) });
+  } else if (op === "insert") {
+    const p = Math.max(0, Math.min(pos, a.length));
+    for (let i = 0; i < p; i++) F.push({ list: [...a], cur: i, msg: msg(`Walk to position ${p}: cur = ${a[i]}.`, `অবস্থান ${p} পর্যন্ত হাঁটো: cur = ${a[i]}।`) });
+    a.splice(p, 0, x); F.push({ list: [...a], hl: [p], msg: msg(`newNode.next = prev.next; prev.next = newNode → ${x} at position ${p}.`, `newNode.next = prev.next; prev.next = newNode → ${x} অবস্থান ${p} এ।`) });
+  } else if (op === "delete") {
+    let i = 0;
+    for (; i < a.length; i++) { F.push({ list: [...a], cur: i, msg: msg(`Compare ${a[i]} with ${x}.`, `${a[i]} কে ${x} এর সাথে মেলাও।`) }); if (a[i] === x) break; }
+    if (i === a.length) F.push({ list: [...a], msg: msg(`${x} not found.`, `${x} পাওয়া যায়নি।`) });
+    else { F.push({ list: [...a], gone: i, msg: msg(`Found. prev.next = cur.next — node ${x} is skipped.`, `পাওয়া গেছে। prev.next = cur.next — ${x} node বাদ পড়ল।`) }); a.splice(i, 1); }
+  } else if (op === "reverse") {
+    const r = []; const rest = [...a];
+    F.push({ list: [...a], rev: 0, msg: msg("prev = null, cur = head.", "prev = null, cur = head।") });
+    while (rest.length) { const c = rest.shift(); r.unshift(c); F.push({ list: [...r, ...rest], rev: r.length, hl: [0], msg: msg(`next = cur.next; cur.next = prev (${c} now points back); prev = cur; cur = next.`, `next = cur.next; cur.next = prev (${c} এখন পিছনে নির্দেশ করে); prev = cur; cur = next।`) }); }
+    a.splice(0, a.length, ...r);
+  }
+  F.push({ list: [...a], done: true, msg: msg(`List: ${a.join(" → ") || "empty"} → null${op === "reverse" ? ". Reversed in O(n) time, O(1) space." : ""}`, `List: ${a.join(" → ") || "খালি"} → null${op === "reverse" ? "। O(n) সময়ে, O(1) জায়গায় উল্টানো হলো।" : ""}`) });
+  return { frames: F, list: a };
+}
+/** Hash table insert: mode "chain" or "probe" (linear probing), h(k) = k mod m. */
+export function hashInsert(keys, m = 7, mode = "chain") {
+  const T = Array.from({ length: m }, () => (mode === "chain" ? [] : null)); const F = []; let collisions = 0;
+  const snap = () => (mode === "chain" ? T.map((c) => [...c]) : [...T]);
+  F.push({ T: snap(), msg: msg(`Empty table of size m = ${m}; h(k) = k mod ${m}.`, `m = ${m} ঘরের খালি table; h(k) = k mod ${m}।`) });
+  for (const k of keys) {
+    const h0 = ((k % m) + m) % m;
+    if (mode === "chain") {
+      if (T[h0].length) collisions++; T[h0].push(k);
+      F.push({ T: snap(), hl: [h0], key: k, msg: msg(`h(${k}) = ${k} mod ${m} = ${h0}${T[h0].length > 1 ? " — collision, add to the chain" : ""}.`, `h(${k}) = ${k} mod ${m} = ${h0}${T[h0].length > 1 ? " — collision, chain এ যোগ করো" : ""}।`) });
+    } else {
+      let i = 0, s = h0;
+      while (T[s] !== null && i < m) { collisions++; F.push({ T: snap(), hl: [s], bad: [s], key: k, msg: msg(`Slot ${s} is taken by ${T[s]} → try ${(s + 1) % m}.`, `ঘর ${s} এ ${T[s]} আছে → ${(s + 1) % m} এ চেষ্টা করো।`) }); i++; s = (h0 + i) % m; }
+      if (i === m) { F.push({ T: snap(), key: k, msg: msg("Table full!", "Table ভরা!") }); continue; }
+      T[s] = k; F.push({ T: snap(), hl: [s], key: k, msg: msg(`h(${k}) = ${h0}${s !== h0 ? `, probed to ${s}` : ""} → store ${k} in slot ${s}.`, `h(${k}) = ${h0}${s !== h0 ? `, probe করে ${s}` : ""} → ${k} কে ঘর ${s} এ রাখো।`) });
+    }
+  }
+  F.push({ T: snap(), done: true, msg: msg(`Load factor α = n/m = ${keys.length}/${m} = ${(keys.length / m).toFixed(2)}; ${collisions} collision${collisions === 1 ? "" : "s"}.`, `Load factor α = n/m = ${keys.length}/${m} = ${(keys.length / m).toFixed(2)}; ${collisions} টা collision।`) });
+  return { frames: F, table: T, collisions };
+}
+/** Trie insert (+ optional search) with frames. */
+export function trieBuild(words, search = null) {
+  const root = { ch: "•", kids: {}, end: false, id: 0 }; let id = 1; const F = [];
+  const clone = (n) => ({ ch: n.ch, end: n.end, id: n.id, kids: Object.fromEntries(Object.entries(n.kids).map(([k, v]) => [k, clone(v)])) });
+  F.push({ t: clone(root), path: [0], msg: msg("Empty trie: just the root.", "খালি trie: শুধু root।") });
+  for (const w of words) {
+    let n = root; const path = [0];
+    for (const c of w) {
+      const isNew = !n.kids[c]; if (isNew) n.kids[c] = { ch: c, kids: {}, end: false, id: id++ };
+      n = n.kids[c]; path.push(n.id);
+      F.push({ t: clone(root), path: [...path], msg: msg(`"${w}": ${isNew ? `create node '${c}'` : `'${c}' already exists — share it`}.`, `"${w}": ${isNew ? `'${c}' node বানাও` : `'${c}' আগেই আছে — ভাগ করে নাও`}।`) });
+    }
+    n.end = true; F.push({ t: clone(root), path, endAt: n.id, msg: msg(`Mark '${w[w.length - 1]}' as the end of "${w}".`, `'${w[w.length - 1]}' কে "${w}" এর শেষ হিসেবে চিহ্নিত করো।`) });
+  }
+  let found = null;
+  if (search) {
+    let n = root; const path = [0]; let ok = true;
+    for (const c of search) {
+      if (!n.kids[c]) { ok = false; F.push({ t: clone(root), path: [...path], msg: msg(`search "${search}": no child '${c}' → not found.`, `search "${search}": '${c}' child নেই → পাওয়া যায়নি।`) }); break; }
+      n = n.kids[c]; path.push(n.id); F.push({ t: clone(root), path: [...path], msg: msg(`search "${search}": follow '${c}'.`, `search "${search}": '${c}' ধরে যাও।`) });
+    }
+    found = ok && n.end;
+    if (ok) F.push({ t: clone(root), path, endAt: n.end ? n.id : undefined, msg: found ? msg(`"${search}" found — end mark present. O(length of word).`, `"${search}" পাওয়া গেছে — শেষ চিহ্ন আছে। O(শব্দের দৈর্ঘ্য)।`) : msg(`"${search}" is only a prefix, not a stored word.`, `"${search}" শুধু একটা prefix, পুরো শব্দ না।`) });
+  }
+  const count = (n) => 1 + Object.values(n.kids).reduce((s, k) => s + count(k), 0);
+  F.push({ t: clone(root), done: true, msg: msg(`${count(root)} nodes for ${words.length} words — shared prefixes are stored once.`, `${words.length} টা শব্দে ${count(root)} টা node — একই prefix একবারই রাখা হয়।`) });
+  return { frames: F, nodes: count(root), found };
+}

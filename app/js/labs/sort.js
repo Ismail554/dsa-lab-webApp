@@ -19,12 +19,18 @@ export default {
       bars(svg, a, { cls: (k) => [f.done ? "ok" : "", f.range && !inR(k) ? "dim" : "", f.piv === k ? "piv" : "", (f.fixed || []).includes(k) ? "ok" : "", f.i === k || f.j === k || f.key === k || f.mid === k ? "hl" : "", f.merged && inR(k) ? "merged" : "", f.sortedTo !== undefined && k <= f.sortedTo ? "ok" : ""].join(" ") });
       ui.view.replaceChildren(svg);
     };
-    const P = player(ui, draw);
+    const P = player(ui, draw, { state: (f) => {
+      const bn = lang() === "bn";
+      if (s.algo === "merge") return [f.range ? { label: bn ? "এখনকার অংশ" : "Current range", items: [`[${f.range[0]}..${f.range[1]}]`], tone: "hot" } : null, f.range ? { label: bn ? "মান" : "Values", items: f.a.slice(f.range[0], f.range[1] + 1) } : null, f.depth !== undefined ? { label: "depth", items: [f.depth] } : null];
+      if (s.algo === "quick") return [f.range ? { label: "range", items: [`[${f.range[0]}..${f.range[1]}]`] } : null, f.piv !== undefined ? { label: "pivot", items: [f.a[f.piv]], tone: "bad" } : null, f.i !== undefined ? { label: "i, j", items: [f.i, f.j], tone: "hot" } : null, f.fixed ? { label: bn ? "স্থায়ী জায়গায়" : "In final place", items: f.fixed.map((k) => f.a[k]), tone: "ok" } : null];
+      if (s.algo === "insertion") return [f.sortedTo !== undefined ? { label: bn ? "Sorted অংশ" : "Sorted part", items: f.a.slice(0, f.sortedTo + 1), tone: "ok" } : null, f.key !== undefined ? { label: "key", items: [f.a[f.key]], tone: "hot" } : null];
+      return [f.range ? { label: "lo, hi", items: f.range } : null, f.mid !== undefined ? { label: "mid", items: [`${f.mid} → ${f.a[f.mid]}`], tone: "hot" } : null, { label: "target", items: [s.target] }];
+    } });
     function run() {
-      if (s.algo === "merge") P.load(mergeSort(s.arr).frames);
-      else if (s.algo === "quick") P.load(quickSort(s.arr).frames);
-      else if (s.algo === "insertion") P.load(insertionSort(s.arr).frames);
-      else { const a = [...s.arr].sort((x, y) => x - y); P.load(binarySearch(a, s.target).frames); }
+      if (s.algo === "merge") P.load(mergeSort(s.arr).frames, 0, "merge");
+      else if (s.algo === "quick") P.load(quickSort(s.arr).frames, 0, "quick");
+      else if (s.algo === "insertion") P.load(insertionSort(s.arr).frames, 0, "insertion");
+      else { const a = [...s.arr].sort((x, y) => x - y); P.load(binarySearch(a, s.target).frames, 0, "binary"); }
       info();
     }
     const seg = segmented([["merge", "merge sort"], ["quick", "quick sort"], ["insertion", "insertion sort"], ["binary", "binary search"]].map(([value, label]) => ({ value, label })), s.algo, (v) => { s.algo = v; run(); });

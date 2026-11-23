@@ -7,6 +7,7 @@ import graph from "./graph.js";
 import sort from "./sort.js";
 import greedy from "./greedy.js";
 import dp from "./dp.js";
+import linear from "./linear.js";
 
-export const LABS = [growth, recursion, heap, avl, btree, graph, sort, greedy, dp];
+export const LABS = [growth, recursion, linear, heap, avl, btree, graph, sort, greedy, dp];
 export const labById = (id) => LABS.find((l) => l.id === id);
