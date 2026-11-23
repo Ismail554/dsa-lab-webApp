@@ -107,7 +107,7 @@ ${extra || "(none)"}`.trim();
 
 // ---------- Gemini (Google Generative Language API) ----------
 const GEMINI_KEY = () => process.env.GEMINI_API_KEY || "";
-const GEMINI_MODELS = [...new Set([process.env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-3-flash-preview"].filter(Boolean))];
+const GEMINI_MODELS = [...new Set([process.env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.5-flash", "gemini-3-flash-preview", "gemini-2.5-flash-lite"].filter(Boolean))];
 let geminiFailed = false;
 async function callGemini({ system, messages, max_tokens = 2000, deep = false }) {
   const contents = messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content) }] }));
@@ -124,8 +124,8 @@ async function callGemini({ system, messages, max_tokens = 2000, deep = false })
         method: "POST", signal: ac.signal, headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_KEY() }, body: JSON.stringify(body),
       });
       const j = await r.json().catch(() => ({}));
-      if (r.status === 401 || r.status === 403) { geminiFailed = true; throw Object.assign(new Error("Gemini key rejected"), { status: 503 }); }
-      if (!r.ok) { lastErr = Object.assign(new Error(j.error?.message || `Gemini error ${r.status}`), { status: r.status }); if ([400, 404, 429].includes(r.status) || r.status >= 500) continue; throw lastErr; }
+      if (r.status === 401 || (r.status === 403 && !/model/i.test(j.error?.message || ""))) { geminiFailed = true; throw Object.assign(new Error("Gemini key rejected"), { status: 503 }); }
+      if (!r.ok) { lastErr = Object.assign(new Error(j.error?.message || `Gemini error ${r.status}`), { status: r.status }); if ([400, 403, 404, 429].includes(r.status) || r.status >= 500) continue; throw lastErr; }
       const cand = j.candidates?.[0];
       const text = (cand?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || "").join("").trim();
       if (!text) { lastErr = new Error(cand?.finishReason === "SAFETY" ? "দুঃখিত, এই প্রশ্নে সাহায্য করতে পারছি না।" : "Empty reply from Gemini"); continue; }
